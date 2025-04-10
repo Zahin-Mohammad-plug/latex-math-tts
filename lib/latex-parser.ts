@@ -682,8 +682,25 @@ export function parseLatex(
   result = result.replace(/\\(\[|\]|\(|\))/g, "$1")
   
   // Process distribution notation
-  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)\(([^)]+)\)/g, "$1 is distributed as $2 with parameters $3")
-  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)/g, "$1 is distributed as $2")
+  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)\(([^)]+)\)/g, (match, left, dist, params) => {
+    // Apply mappings to distribution symbols if they exist
+    const trimmedDist = dist.trim();
+    // Check for single capital letters that might have mappings
+    if (trimmedDist.length === 1 && /[A-Z]/.test(trimmedDist) && customMappings[trimmedDist]) {
+      return `${left} is distributed as ${customMappings[trimmedDist]} with parameters ${params}`;
+    }
+    return `${left} is distributed as ${dist} with parameters ${params}`;
+  });
+  
+  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)/g, (match, left, dist) => {
+    // Apply mappings to distribution symbols if they exist
+    const trimmedDist = dist.trim();
+    // Check for single capital letters that might have mappings
+    if (trimmedDist.length === 1 && /[A-Z]/.test(trimmedDist) && customMappings[trimmedDist]) {
+      return `${left} is distributed as ${customMappings[trimmedDist]}`;
+    }
+    return `${left} is distributed as ${dist}`;
+  });
 
   // Process equals signs
   result = result.replace(/=/g, "equals")
