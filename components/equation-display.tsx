@@ -1,3 +1,4 @@
+// components\equation-display.tsx
 "use client"
 
 import { useEffect, useRef } from "react"
@@ -29,25 +30,24 @@ export function EquationDisplay({ latex }: EquationDisplayProps) {
         const { default: renderMathInElement } = await import("katex/contrib/auto-render")
 
         if (containerRef.current) {
-          // First, set the raw content
-          containerRef.current.textContent = latex
-
+          // First, set the content as HTML rather than textContent
+          // This preserves both text and LaTeX structures
+          containerRef.current.innerHTML = latex
+            // Protect LaTeX delimiters from being interpreted as HTML
+            .replace(/\$/g, '\\$');
+            
           // Then render the math
           renderMathInElement(containerRef.current, {
             delimiters: [
               { left: "$$", right: "$$", display: true },
               { left: "$", right: "$", display: false },
-              { left: "$$", right: "$$", display: false },
               { left: "\\[", right: "\\]", display: true },
+              { left: "\\(", right: "\\)", display: false },
             ],
             throwOnError: false,
             output: "html",
             trust: true,
             strict: false,
-            macros: {
-              "\\Bigg": "\\Bigg",
-              "\\bigg": "\\bigg",
-            },
           })
         }
       } catch (error) {

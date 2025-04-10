@@ -1,3 +1,4 @@
+// app\page.tsx
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -137,111 +138,148 @@ export default function MathTTS() {
     }
   }, [input, latexMappings, useSymbolPrefix, symbolPrefix, prefixCategories, groupSymbols])
 
-  // Handle speech synthesis with custom pauses
-  const speak = (text: string, index: number) => {
-    if (!speechSynthesis) return
+// This is the corrected speak function to fix the "Break, Time equals 500 ms" issue
+// Replace the current speak function in page.tsx with this version
 
-    speechSynthesis.cancel() // Cancel any ongoing speech
-    setCurrentWordIndex(-1)
+// Handle speech synthesis with custom pauses
+const speak = (text: string, index: number) => {
+  if (!speechSynthesis) return
 
-    // Split text into words for highlighting
-    const textWords = text.split(/\s+/)
-    let currentWordIdx = 0
+  speechSynthesis.cancel() // Cancel any ongoing speech
+  setCurrentWordIndex(-1)
 
-    // Insert SSML-like pauses based on punctuation
-    const textWithPauses = text
-      .replace(/\.\s+/g, `. <break time="${pauseSettings.period}ms"/> `)
-      .replace(/\n/g, ` <break time="${pauseSettings.newline}ms"/> `)
-      .replace(/,\s+/g, `, <break time="${pauseSettings.comma}ms"/> `)
-      // Handle spaces differently based on context (in equations vs general)
-      .replace(/\s+/g, ` <break time="${pauseSettings.generalSpace}ms"/> `)
-      // Replace symbol group markers with shorter pauses
-      .replace(/-/g, ` <break time="${pauseSettings.symbolGroup}ms"/> `)
+  // Split text into words for highlighting
+  const textWords = text.split(/\s+/)
+  let currentWordIdx = 0
 
-    // Process the text with pauses
-    const segments = textWithPauses.split(/<break time="(\d+)ms"\/>/)
+  // We will NOT add SSML-like tags directly to the text
+  // Instead, we'll split the text into segments and use setTimeout for pauses
+  
+  // Split text by punctuation that we want to add pauses after
+  const segments: { text: string; pauseAfter: number }[] = []
+  
+  // Helper to add segment and pause
+  const addSegment = (segmentText: string, pauseDuration: number) => {
+    if (segmentText.trim()) {
+      segments.push({ text: segmentText.trim(), pauseAfter: pauseDuration });
+    }
+  }
+  
+  // Process the text character by character to create segments
+  let currentSegment = "";
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    currentSegment += char;
+    
+    // Check for pause points
+    if (char === '.' && (i === text.length - 1 || text[i+1] === ' ')) {
+      // End of sentence - period followed by space or end of text
+      addSegment(currentSegment, pauseSettings.period);
+      currentSegment = "";
+    } else if (char === ',' && (i === text.length - 1 || text[i+1] === ' ')) {
+      // Comma followed by space
+      addSegment(currentSegment, pauseSettings.comma);
+      currentSegment = "";
+    } else if (char === '\n') {
+      // Newline
+      addSegment(currentSegment, pauseSettings.newline);
+      currentSegment = "";
+    } else if (char === ' ') {
+      // Space (apply different pause based on context)
+      // For simplicity, we'll use generalSpace for all spaces here
+      addSegment(currentSegment, pauseSettings.generalSpace);
+      currentSegment = "";
+    } else if (char === '-' && text.substring(i-7, i) === "symbol-") {
+      // Symbol group marker
+      addSegment(currentSegment, pauseSettings.symbolGroup);
+      currentSegment = "";
+    }
+  }
+  
+  // Add any remaining text
+  if (currentSegment.trim()) {
+    addSegment(currentSegment, 0);
+  }
 
-    const speakSegment = (segmentIndex: number) => {
-      if (segmentIndex >= segments.length) {
-        if (index < sentences.length - 1) {
-          speak(sentences[index + 1], index + 1)
-        } else {
-          setIsPlaying(false)
-          setCurrentUtterance(null)
-          setCurrentWordIndex(-1)
-        }
-        return
-      }
-
-      const segment = segments[segmentIndex]
-
-      // If this is a pause duration
-      if (segmentIndex % 2 === 1) {
-        const pauseDuration = Number.parseInt(segment, 10)
-        setTimeout(() => speakSegment(segmentIndex + 1), pauseDuration)
-        return
-      }
-
-      // Skip empty segments
-      if (!segment.trim()) {
-        speakSegment(segmentIndex + 1)
-        return
-      }
-
-      const utterance = new SpeechSynthesisUtterance(segment)
-      utterance.rate = rate
-
-      // Set selected voice if available
-      if (selectedVoice) {
-        const voice = availableVoices.find((v) => v.name === selectedVoice)
-        if (voice) {
-          utterance.voice = voice
-        }
-      }
-
-      // Word boundary event for highlighting
-      utterance.onboundary = (event) => {
-        if (event.name === "word") {
-          const wordPosition = event.charIndex
-          const word = segment.substring(wordPosition).split(/\s+/)[0]
-
-          // Calculate global word index
-          const globalWordIdx = sentences.slice(0, index).join(" ").split(/\s+/).length + currentWordIdx
-          setCurrentWordIndex(globalWordIdx)
-          currentWordIdx++
-
-          // Scroll to the current word
-          if (speechPreviewRef.current) {
-            const wordElements = speechPreviewRef.current.querySelectorAll(".word")
-            if (wordElements[globalWordIdx]) {
-              wordElements[globalWordIdx].scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              })
-            }
-          }
-        }
-      }
-
-      utterance.onend = () => {
-        speakSegment(segmentIndex + 1)
-      }
-
-      utterance.onerror = () => {
+  // Function to speak segments in sequence
+  const speakSegment = (segmentIndex: number) => {
+    if (segmentIndex >= segments.length) {
+      if (index < sentences.length - 1) {
+        speak(sentences[index + 1], index + 1)
+      } else {
         setIsPlaying(false)
         setCurrentUtterance(null)
         setCurrentWordIndex(-1)
       }
-
-      speechSynthesis.speak(utterance)
-      setCurrentUtterance(utterance)
+      return
     }
 
-    speakSegment(0)
-    setCurrentSentence(index)
-    setIsPlaying(true)
+    const { text: segmentText, pauseAfter } = segments[segmentIndex];
+
+    // Skip empty segments
+    if (!segmentText.trim()) {
+      speakSegment(segmentIndex + 1)
+      return
+    }
+
+    const utterance = new SpeechSynthesisUtterance(segmentText)
+    utterance.rate = rate
+
+    // Set selected voice if available
+    if (selectedVoice) {
+      const voice = availableVoices.find((v) => v.name === selectedVoice)
+      if (voice) {
+        utterance.voice = voice
+      }
+    }
+
+    // Word boundary event for highlighting
+    utterance.onboundary = (event) => {
+      if (event.name === "word") {
+        const wordPosition = event.charIndex
+        const word = segmentText.substring(wordPosition).split(/\s+/)[0]
+
+        // Calculate global word index
+        const globalWordIdx = sentences.slice(0, index).join(" ").split(/\s+/).length + currentWordIdx
+        setCurrentWordIndex(globalWordIdx)
+        currentWordIdx++
+
+        // Scroll to the current word
+        if (speechPreviewRef.current) {
+          const wordElements = speechPreviewRef.current.querySelectorAll(".word")
+          if (wordElements[globalWordIdx]) {
+            wordElements[globalWordIdx].scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            })
+          }
+        }
+      }
+    }
+
+    utterance.onend = () => {
+      // After this segment finishes, wait for the pause duration then speak the next segment
+      if (pauseAfter > 0) {
+        setTimeout(() => speakSegment(segmentIndex + 1), pauseAfter);
+      } else {
+        speakSegment(segmentIndex + 1);
+      }
+    }
+
+    utterance.onerror = () => {
+      setIsPlaying(false)
+      setCurrentUtterance(null)
+      setCurrentWordIndex(-1)
+    }
+
+    speechSynthesis.speak(utterance)
+    setCurrentUtterance(utterance)
   }
 
+  speakSegment(0)
+  setCurrentSentence(index)
+  setIsPlaying(true)
+}
   // Play control
   const startPlayback = () => {
     if (sentences.length === 0) return

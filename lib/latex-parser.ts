@@ -1,3 +1,4 @@
+// lib\latex-parser.ts
 // Symbol categories for prefix application
 export type SymbolCategory = "greek" | "operators" | "comparison" | "sets" | "other"
 
