@@ -69,77 +69,42 @@ export default function MathTTS() {
   const [editedReplacement, setEditedReplacement] = useState("")
 
   // Symbol prefix settings
-  const [useSymbolPrefix, setUseSymbolPrefix] = useState(() => {
-    return localStorage.getItem('mathTTS_useSymbolPrefix') === 'false' ? false : true
-  })
-  const [symbolPrefix, setSymbolPrefix] = useState(() => {
-    return localStorage.getItem('mathTTS_symbolPrefix') || "symbol of"
-  })
+  const [useSymbolPrefix, setUseSymbolPrefix] = useState<boolean>(true)
+  const [symbolPrefix, setSymbolPrefix] = useState<string>("symbol of")
 
   // Symbol categories to apply prefix to
-  const [prefixCategories, setPrefixCategories] = useState<Record<SymbolCategory, boolean>>(() => {
-    const saved = localStorage.getItem('mathTTS_prefixCategories')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch (e) {
-        console.error('Failed to parse saved prefix categories', e)
-      }
-    }
-    return {
-      greek: true,
-      operators: true,
-      comparison: true,
-      sets: true,
-      statistics: true,
-      other: false,
-    }
+  const [prefixCategories, setPrefixCategories] = useState<Record<SymbolCategory, boolean>>({
+    greek: true,
+    operators: true,
+    comparison: true,
+    sets: true,
+    statistics: true,
+    other: false,
   })
 
   // Pause settings
-  const [pauseSettings, setPauseSettings] = useState(() => {
-    const saved = localStorage.getItem('mathTTS_pauseSettings')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch (e) {
-        console.error('Failed to parse saved pause settings', e)
-      }
-    }
-    return {
-      period: 1000, // ms
-      newline: 800, // ms
-      space: 200, // ms in equations
-      generalSpace: 50, // ms for general spaces
-      comma: 500, // ms
-      symbolGroup: 10, // ms for grouped symbols (much faster)
-    }
+  const [pauseSettings, setPauseSettings] = useState({
+    period: 1000, // ms
+    newline: 800, // ms
+    space: 200, // ms in equations
+    generalSpace: 50, // ms for general spaces
+    comma: 500, // ms
+    symbolGroup: 10, // ms for grouped symbols (much faster)
   })
 
   // Symbol grouping settings
-  const [groupSymbols, setGroupSymbols] = useState(() => {
-    return localStorage.getItem('mathTTS_groupSymbols') === 'false' ? false : true
-  })
+  const [groupSymbols, setGroupSymbols] = useState<boolean>(true)
   
   // New line announcement setting
-  const [announceNewLines, setAnnounceNewLines] = useState(() => {
-    return localStorage.getItem('mathTTS_announceNewLines') === 'true'
-  })
+  const [announceNewLines, setAnnounceNewLines] = useState<boolean>(false)
 
   // Auto-scroll setting
-  const [autoScroll, setAutoScroll] = useState(() => {
-    return localStorage.getItem('mathTTS_autoScroll') === 'false' ? false : true
-  })
+  const [autoScroll, setAutoScroll] = useState<boolean>(true)
 
   // Word length-based timing
-  const [useWordLengthTiming, setUseWordLengthTiming] = useState(() => {
-    return localStorage.getItem('mathTTS_useWordLengthTiming') === 'true'
-  })
+  const [useWordLengthTiming, setUseWordLengthTiming] = useState<boolean>(false)
   
-  const [wordLengthTimingFactor, setWordLengthTimingFactor] = useState(() => {
-    const saved = localStorage.getItem('mathTTS_wordLengthTimingFactor')
-    return saved ? parseFloat(saved) : 10 // ms per character
-  })
+  const [wordLengthTimingFactor, setWordLengthTimingFactor] = useState<number>(10) // ms per character
 
   const speechSynthesis = typeof window !== "undefined" ? window.speechSynthesis : null
   const speechPreviewRef = useRef<HTMLDivElement>(null)
@@ -210,15 +175,77 @@ export default function MathTTS() {
     }
   }, [speechSynthesis, selectedVoice])
   
-  // Load rate from localStorage
+  // Load settings from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Load rate
       const savedRate = localStorage.getItem('mathTTS_rate')
       if (savedRate) {
         try {
           setRate(parseFloat(savedRate))
         } catch (e) {
           console.error('Failed to parse saved rate', e)
+        }
+      }
+      
+      // Load symbol prefix settings
+      const savedUseSymbolPrefix = localStorage.getItem('mathTTS_useSymbolPrefix')
+      if (savedUseSymbolPrefix !== null) {
+        setUseSymbolPrefix(savedUseSymbolPrefix === 'false' ? false : true)
+      }
+      
+      const savedSymbolPrefix = localStorage.getItem('mathTTS_symbolPrefix')
+      if (savedSymbolPrefix) {
+        setSymbolPrefix(savedSymbolPrefix)
+      }
+      
+      // Load prefix categories
+      const savedPrefixCategories = localStorage.getItem('mathTTS_prefixCategories')
+      if (savedPrefixCategories) {
+        try {
+          setPrefixCategories(JSON.parse(savedPrefixCategories))
+        } catch (e) {
+          console.error('Failed to parse saved prefix categories', e)
+        }
+      }
+      
+      // Load pause settings
+      const savedPauseSettings = localStorage.getItem('mathTTS_pauseSettings')
+      if (savedPauseSettings) {
+        try {
+          setPauseSettings(JSON.parse(savedPauseSettings))
+        } catch (e) {
+          console.error('Failed to parse saved pause settings', e)
+        }
+      }
+      
+      // Load other boolean settings
+      const savedGroupSymbols = localStorage.getItem('mathTTS_groupSymbols')
+      if (savedGroupSymbols !== null) {
+        setGroupSymbols(savedGroupSymbols === 'false' ? false : true)
+      }
+      
+      const savedAnnounceNewLines = localStorage.getItem('mathTTS_announceNewLines')
+      if (savedAnnounceNewLines !== null) {
+        setAnnounceNewLines(savedAnnounceNewLines === 'true')
+      }
+      
+      const savedAutoScroll = localStorage.getItem('mathTTS_autoScroll')
+      if (savedAutoScroll !== null) {
+        setAutoScroll(savedAutoScroll === 'false' ? false : true)
+      }
+      
+      const savedUseWordLengthTiming = localStorage.getItem('mathTTS_useWordLengthTiming')
+      if (savedUseWordLengthTiming !== null) {
+        setUseWordLengthTiming(savedUseWordLengthTiming === 'true')
+      }
+      
+      const savedWordLengthTimingFactor = localStorage.getItem('mathTTS_wordLengthTimingFactor')
+      if (savedWordLengthTimingFactor) {
+        try {
+          setWordLengthTimingFactor(parseFloat(savedWordLengthTimingFactor))
+        } catch (e) {
+          console.error('Failed to parse saved word length timing factor', e)
         }
       }
     }

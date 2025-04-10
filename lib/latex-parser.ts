@@ -89,7 +89,7 @@ const symbolCategories: Record<string, SymbolCategory> = {
   "\\mathcal{F}": "statistics",
   "\\mathcal{T}": "statistics",
   "\\mathcal{X}": "statistics",
-  "\\chi": "statistics",
+  "\\chi2": "statistics",
 }
 
 // Default LaTeX to speech translation mappings
@@ -111,6 +111,7 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\chi^2": "chi-squared",
   // Distribution notation
   "\\sim": "distributed as",
+  "\\approx": "approx-equal-to",
   "\\mid": "given",
   "\\vert": "given",
   "\\lvert": "given",
@@ -166,7 +167,7 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\Psi": "capital psi",
   "\\Omega": "capital omega",
   // Symbols
-  "\\approx": "approximately equal to",
+  // Note: Some symbols are already defined in the Greek letters section
   "\\neq": "not equal to",
   "\\leq": "less than or equal to",
   "\\geq": "greater than or equal to",
@@ -595,16 +596,29 @@ export function parseLatex(
   result = result.replace(/([A-Za-z])\s*~\s*([^(]+)/g, "$1 is distributed as $2")
 
   // Process equals signs
-  result = result.replace(/=/g, "symbol-of-equals")
+  result = result.replace(/=/g, "equals")
   
-  // Handle decimal points to be read as a whole number
+  // Handle minus signs in mathematical contexts
+  // Replace minus signs in front of numbers (negative numbers)
+  result = result.replace(/-(\d+)/g, "negative $1")
+  // // Replace minus signs between terms (subtraction)
+  // result = result.replace(/(\w|\)|\})\s*-\s*(\w|\(|\{)/g, "$1 minus $2")
+  result = result.replace(/\s - /g, " dash ")
+  // Replace dash in other contexts (keep as dash)
+  result = result.replace(/\s-\s/g, " dash ")
+  
+  // Handle decimal points in numbers with more explicit language
   result = result.replace(/(\d+)\.(\d+)/g, "$1 point $2")
   
-  // Announce periods
-  result = result.replace(/\./g, " period ")
+  // Handle periods at the end of sentences or standalone
+  // First mark periods that are not part of decimal points
+  result = result.replace(/([^0-9])\.([^0-9]|$)/g, "$1 period $2")
   
   // Process text in math mode
   result = result.replace(/\\text\{([^{}]*)\}/g, "text $1")
+  
+  // Clean up any double spaces that might have been introduced
+  result = result.replace(/\s{2,}/g, " ")
 
   // Fix comma handling to prevent SSML issues and add spaces
   result = result.replace(/,/g, " comma ")
