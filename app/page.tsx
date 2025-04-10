@@ -1,7 +1,7 @@
 // app\page.tsx
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import {
   Play,
   Pause,
@@ -29,8 +29,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { parseLatex, defaultLatexMappings, type SymbolCategory } from "@/lib/latex-parser"
 import { EquationDisplay } from "@/components/equation-display"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export default function MathTTS() {
+  const isMobile = useIsMobile()
   const [input, setInput] = useState("")
   const [isPlaying, setIsPlaying] = useState(false)
   const [rate, setRate] = useState(1)
@@ -45,7 +47,20 @@ export default function MathTTS() {
   const [selectedVoice, setSelectedVoice] = useState<string>("")
 
   // Settings state
-  const [latexMappings, setLatexMappings] = useState<Record<string, string>>(defaultLatexMappings)
+  const [latexMappings, setLatexMappings] = useState<Record<string, string>>(() => {
+    // Try to load from localStorage
+    if (typeof window !== 'undefined') {
+      const savedMappings = localStorage.getItem('mathTTS_latexMappings')
+      if (savedMappings) {
+        try {
+          return JSON.parse(savedMappings)
+        } catch (e) {
+          console.error('Failed to parse saved latex mappings', e)
+        }
+      }
+    }
+    return defaultLatexMappings
+  })
   const [newCommand, setNewCommand] = useState("")
   const [newReplacement, setNewReplacement] = useState("")
 
@@ -54,34 +69,117 @@ export default function MathTTS() {
   const [editedReplacement, setEditedReplacement] = useState("")
 
   // Symbol prefix settings
-  const [useSymbolPrefix, setUseSymbolPrefix] = useState(true)
-  const [symbolPrefix, setSymbolPrefix] = useState("symbol of")
+  const [useSymbolPrefix, setUseSymbolPrefix] = useState(() => {
+    return localStorage.getItem('mathTTS_useSymbolPrefix') === 'false' ? false : true
+  })
+  const [symbolPrefix, setSymbolPrefix] = useState(() => {
+    return localStorage.getItem('mathTTS_symbolPrefix') || "symbol of"
+  })
 
   // Symbol categories to apply prefix to
-  const [prefixCategories, setPrefixCategories] = useState<Record<SymbolCategory, boolean>>({
-    greek: true,
-    operators: true,
-    comparison: true,
-    sets: true,
-    statistics: true,
-    other: false,
+  const [prefixCategories, setPrefixCategories] = useState<Record<SymbolCategory, boolean>>(() => {
+    const saved = localStorage.getItem('mathTTS_prefixCategories')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved prefix categories', e)
+      }
+    }
+    return {
+      greek: true,
+      operators: true,
+      comparison: true,
+      sets: true,
+      statistics: true,
+      other: false,
+    }
   })
 
   // Pause settings
-  const [pauseSettings, setPauseSettings] = useState({
-    period: 1000, // ms
-    newline: 800, // ms
-    space: 200, // ms in equations
-    generalSpace: 50, // ms for general spaces
-    comma: 500, // ms
-    symbolGroup: 10, // ms for grouped symbols (much faster)
+  const [pauseSettings, setPauseSettings] = useState(() => {
+    const saved = localStorage.getItem('mathTTS_pauseSettings')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved pause settings', e)
+      }
+    }
+    return {
+      period: 1000, // ms
+      newline: 800, // ms
+      space: 200, // ms in equations
+      generalSpace: 50, // ms for general spaces
+      comma: 500, // ms
+      symbolGroup: 10, // ms for grouped symbols (much faster)
+    }
   })
 
   // Symbol grouping settings
-  const [groupSymbols, setGroupSymbols] = useState(true)
+  const [groupSymbols, setGroupSymbols] = useState(() => {
+    return localStorage.getItem('mathTTS_groupSymbols') === 'false' ? false : true
+  })
+  
+  // New line announcement setting
+  const [announceNewLines, setAnnounceNewLines] = useState(() => {
+    return localStorage.getItem('mathTTS_announceNewLines') === 'true'
+  })
+
+  // Auto-scroll setting
+  const [autoScroll, setAutoScroll] = useState(() => {
+    return localStorage.getItem('mathTTS_autoScroll') === 'false' ? false : true
+  })
+
+  // Word length-based timing
+  const [useWordLengthTiming, setUseWordLengthTiming] = useState(() => {
+    return localStorage.getItem('mathTTS_useWordLengthTiming') === 'true'
+  })
+  
+  const [wordLengthTimingFactor, setWordLengthTimingFactor] = useState(() => {
+    const saved = localStorage.getItem('mathTTS_wordLengthTimingFactor')
+    return saved ? parseFloat(saved) : 10 // ms per character
+  })
 
   const speechSynthesis = typeof window !== "undefined" ? window.speechSynthesis : null
   const speechPreviewRef = useRef<HTMLDivElement>(null)
+  
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mathTTS_latexMappings', JSON.stringify(latexMappings))
+      localStorage.setItem('mathTTS_useSymbolPrefix', String(useSymbolPrefix))
+      localStorage.setItem('mathTTS_symbolPrefix', symbolPrefix)
+      localStorage.setItem('mathTTS_prefixCategories', JSON.stringify(prefixCategories))
+      localStorage.setItem('mathTTS_pauseSettings', JSON.stringify(pauseSettings))
+      localStorage.setItem('mathTTS_groupSymbols', String(groupSymbols))
+      localStorage.setItem('mathTTS_announceNewLines', String(announceNewLines))
+      localStorage.setItem('mathTTS_autoScroll', String(autoScroll))
+      localStorage.setItem('mathTTS_useWordLengthTiming', String(useWordLengthTiming))
+      localStorage.setItem('mathTTS_wordLengthTimingFactor', String(wordLengthTimingFactor))
+      
+      // Also save selected voice if available
+      if (selectedVoice) {
+        localStorage.setItem('mathTTS_selectedVoice', selectedVoice)
+      }
+      
+      // Save rate
+      localStorage.setItem('mathTTS_rate', String(rate))
+    }
+  }, [
+    latexMappings, 
+    useSymbolPrefix, 
+    symbolPrefix, 
+    prefixCategories, 
+    pauseSettings, 
+    groupSymbols, 
+    announceNewLines,
+    autoScroll,
+    useWordLengthTiming,
+    wordLengthTimingFactor,
+    selectedVoice,
+    rate
+  ])
 
   // Load available voices
   useEffect(() => {
@@ -91,8 +189,11 @@ export default function MathTTS() {
       const voices = speechSynthesis.getVoices()
       setAvailableVoices(voices)
 
-      // Set default voice if available
-      if (voices.length > 0 && !selectedVoice) {
+      // Try to restore saved voice or set default
+      const savedVoice = localStorage.getItem('mathTTS_selectedVoice')
+      if (savedVoice && voices.some(v => v.name === savedVoice)) {
+        setSelectedVoice(savedVoice)
+      } else if (voices.length > 0 && !selectedVoice) {
         setSelectedVoice(voices[0].name)
       }
     }
@@ -108,6 +209,20 @@ export default function MathTTS() {
       }
     }
   }, [speechSynthesis, selectedVoice])
+  
+  // Load rate from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRate = localStorage.getItem('mathTTS_rate')
+      if (savedRate) {
+        try {
+          setRate(parseFloat(savedRate))
+        } catch (e) {
+          console.error('Failed to parse saved rate', e)
+        }
+      }
+    }
+  }, [])
 
   // Split text into sentences and parse LaTeX when input changes
   useEffect(() => {
@@ -142,27 +257,43 @@ export default function MathTTS() {
 // This is the corrected speak function to fix the "Break, Time equals 500 ms" issue
 // Replace the current speak function in page.tsx with this version
 
+// Calculate pause duration based on word length if enabled
+const calculateWordPause = (word: string) => {
+  if (!useWordLengthTiming) return pauseSettings.generalSpace;
+  
+  // Base pause plus additional time per character
+  // Ensure the word is not empty to avoid NaN
+  if (!word || word.trim().length === 0) return pauseSettings.generalSpace;
+  
+  // Base pause plus additional time per character
+  return Math.max(10, Math.min(300, word.trim().length * wordLengthTimingFactor));
+};
+
 // Handle speech synthesis with custom pauses
 const speak = (text: string, index: number) => {
   if (!speechSynthesis) return
 
-  speechSynthesis.cancel() // Cancel any ongoing speech
+  // Make sure any ongoing speech is properly cancelled
+  if (speechSynthesis.speaking) {
+    speechSynthesis.cancel()
+  }
+  
   setCurrentWordIndex(-1)
 
   // Split text into words for highlighting
-  const textWords = text.split(/\s+/)
+  const textWords = text.split(/\s+/).filter(word => word.trim().length > 0)
   let currentWordIdx = 0
 
   // We will NOT add SSML-like tags directly to the text
   // Instead, we'll split the text into segments and use setTimeout for pauses
   
   // Split text by punctuation that we want to add pauses after
-  const segments: { text: string; pauseAfter: number }[] = []
+  const segments: { text: string; pauseAfter: number; isWord?: boolean }[] = []
   
   // Helper to add segment and pause
-  const addSegment = (segmentText: string, pauseDuration: number) => {
+  const addSegment = (segmentText: string, pauseDuration: number, isWord: boolean = false) => {
     if (segmentText.trim()) {
-      segments.push({ text: segmentText.trim(), pauseAfter: pauseDuration });
+      segments.push({ text: segmentText.trim(), pauseAfter: pauseDuration, isWord });
     }
   }
   
@@ -175,20 +306,40 @@ const speak = (text: string, index: number) => {
     // Check for pause points
     if (char === '.' && (i === text.length - 1 || text[i+1] === ' ')) {
       // End of sentence - period followed by space or end of text
-      addSegment(currentSegment, pauseSettings.period);
-      currentSegment = "";
+      // Add the current segment with period announcement
+      if (currentSegment.trim()) {
+        addSegment(currentSegment, pauseSettings.period);
+        currentSegment = "";
+      }
     } else if (char === ',' && (i === text.length - 1 || text[i+1] === ' ')) {
       // Comma followed by space
       addSegment(currentSegment, pauseSettings.comma);
       currentSegment = "";
     } else if (char === '\n') {
       // Newline
-      addSegment(currentSegment, pauseSettings.newline);
-      currentSegment = "";
+      if (announceNewLines) {
+        // Add the current segment
+        if (currentSegment.trim()) {
+          addSegment(currentSegment, pauseSettings.generalSpace);
+        }
+        // Add the "new line" announcement
+        addSegment("new line", pauseSettings.newline);
+        currentSegment = "";
+      } else {
+        // Just add a pause without announcing
+        if (currentSegment.trim()) {
+          addSegment(currentSegment, pauseSettings.newline);
+        }
+        currentSegment = "";
+      }
     } else if (char === ' ') {
-      // Space (apply different pause based on context)
-      // For simplicity, we'll use generalSpace for all spaces here
-      addSegment(currentSegment, pauseSettings.generalSpace);
+      // Space - apply word length timing if enabled
+      const word = currentSegment.trim();
+      if (word) {
+        // Calculate pause based on word length if enabled
+        const pauseDuration = useWordLengthTiming ? calculateWordPause(word) : pauseSettings.generalSpace;
+        addSegment(currentSegment, pauseDuration, true);
+      }
       currentSegment = "";
     } else if (char === '-' && text.substring(i-7, i) === "symbol-") {
       // Symbol group marker
@@ -199,7 +350,7 @@ const speak = (text: string, index: number) => {
   
   // Add any remaining text
   if (currentSegment.trim()) {
-    addSegment(currentSegment, 0);
+    addSegment(currentSegment, 0, true);
   }
 
   // Function to speak segments in sequence
@@ -215,7 +366,7 @@ const speak = (text: string, index: number) => {
       return
     }
 
-    const { text: segmentText, pauseAfter } = segments[segmentIndex];
+    const { text: segmentText, pauseAfter, isWord } = segments[segmentIndex];
 
     // Skip empty segments
     if (!segmentText.trim()) {
@@ -242,11 +393,13 @@ const speak = (text: string, index: number) => {
 
         // Calculate global word index
         const globalWordIdx = sentences.slice(0, index).join(" ").split(/\s+/).length + currentWordIdx
+        
+        // Set the current word index for highlighting
         setCurrentWordIndex(globalWordIdx)
         currentWordIdx++
 
-        // Scroll to the current word
-        if (speechPreviewRef.current) {
+        // Scroll to the current word if auto-scroll is enabled
+        if (autoScroll && speechPreviewRef.current) {
           const wordElements = speechPreviewRef.current.querySelectorAll(".word")
           if (wordElements[globalWordIdx]) {
             wordElements[globalWordIdx].scrollIntoView({
@@ -281,21 +434,23 @@ const speak = (text: string, index: number) => {
   setCurrentSentence(index)
   setIsPlaying(true)
 }
-  // Play control
+  // Play control with improved state management
   const startPlayback = () => {
     if (sentences.length === 0) return
 
-    if (speechSynthesis?.paused) {
+    // If already speaking but paused, resume
+    if (speechSynthesis?.speaking && speechSynthesis?.paused) {
       speechSynthesis.resume()
       setIsPlaying(true)
-    } else {
+    } else if (!isPlaying) {
+      // If not playing at all, start from current sentence
       speak(sentences[currentSentence], currentSentence)
     }
   }
 
-  // Pause control
+  // Pause control with improved state management
   const pausePlayback = () => {
-    if (speechSynthesis && isPlaying) {
+    if (speechSynthesis && speechSynthesis.speaking && !speechSynthesis.paused) {
       speechSynthesis.pause()
       setIsPlaying(false)
     }
@@ -419,7 +574,11 @@ const speak = (text: string, index: number) => {
   // Render words with highlighting for current word
   const renderWords = () => {
     return words.map((word, index) => (
-      <span key={index} className={`word ${index === currentWordIndex ? "bg-primary/20 rounded px-1" : ""}`}>
+      <span 
+        key={index} 
+        className={`word ${index === currentWordIndex ? "bg-primary/20 rounded px-1 font-medium" : ""}`}
+        data-word-index={index}
+      >
         {word}{" "}
       </span>
     ))
@@ -459,30 +618,30 @@ const speak = (text: string, index: number) => {
                   <Settings className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+              <SheetContent className={`${isMobile ? "w-full" : "w-[400px] sm:w-[540px]"} overflow-y-auto`}>
                 <SheetHeader>
                   <SheetTitle>Settings</SheetTitle>
                   <SheetDescription>Customize LaTeX mappings and pause durations</SheetDescription>
                 </SheetHeader>
 
                 <Tabs defaultValue="mappings" className="mt-6">
-                  <TabsList className="grid w-full grid-cols-6">
-                    <TabsTrigger value="mappings" className="text-xs sm:text-sm">
+                  <TabsList className={`grid ${isMobile ? 'grid-cols-3' : 'grid-cols-6'} gap-2 w-full`}>
+                    <TabsTrigger value="mappings">
                       Mappings
                     </TabsTrigger>
-                    <TabsTrigger value="symbols" className="text-xs sm:text-sm">
+                    <TabsTrigger value="symbols">
                       Symbols
                     </TabsTrigger>
-                    <TabsTrigger value="pauses" className="text-xs sm:text-sm">
+                    <TabsTrigger value="pauses">
                       Pauses
                     </TabsTrigger>
-                    <TabsTrigger value="grouping" className="text-xs sm:text-sm">
-                      Grouping
+                    <TabsTrigger value="timing">
+                      Timing
                     </TabsTrigger>
-                    <TabsTrigger value="voice" className="text-xs sm:text-sm">
+                    <TabsTrigger value="voice">
                       Voice
                     </TabsTrigger>
-                    <TabsTrigger value="config" className="text-xs sm:text-sm">
+                    <TabsTrigger value="config">
                       Config
                     </TabsTrigger>
                   </TabsList>
@@ -654,6 +813,17 @@ const speak = (text: string, index: number) => {
 
                   <TabsContent value="pauses" className="space-y-6 mt-4">
                     <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="announce-new-lines">Announce new lines</Label>
+                        <Switch 
+                          id="announce-new-lines" 
+                          checked={announceNewLines} 
+                          onCheckedChange={setAnnounceNewLines} 
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, new lines will be announced as "new line" when speaking
+                      </p>
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <Label>Period Pause: {pauseSettings.period}ms</Label>
@@ -737,7 +907,7 @@ const speak = (text: string, index: number) => {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="grouping" className="space-y-6 mt-4">
+                  <TabsContent value="timing" className="space-y-6 mt-4">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="group-symbols">Group related symbols</Label>
@@ -747,6 +917,48 @@ const speak = (text: string, index: number) => {
                         When enabled, related symbols like "symbol of normal distribution" will be grouped together with
                         shorter pauses between words
                       </p>
+                      
+                      <div className="border-t pt-4 mt-6"></div>
+                      
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auto-scroll">Auto-scroll to current word</Label>
+                        <Switch id="auto-scroll" checked={autoScroll} onCheckedChange={setAutoScroll} />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, the view will automatically scroll to the currently spoken word
+                      </p>
+                      
+                      <div className="border-t pt-4 mt-6"></div>
+                      
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="word-length-timing">Word length-based timing</Label>
+                        <Switch 
+                          id="word-length-timing" 
+                          checked={useWordLengthTiming} 
+                          onCheckedChange={setUseWordLengthTiming} 
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, longer words will have longer pauses after them
+                      </p>
+                      
+                      {useWordLengthTiming && (
+                        <div className="space-y-2 mt-2">
+                          <div className="flex justify-between">
+                            <Label>Timing factor: {wordLengthTimingFactor}ms per character</Label>
+                          </div>
+                          <Slider
+                            value={[wordLengthTimingFactor]}
+                            min={5}
+                            max={30}
+                            step={1}
+                            onValueChange={(value) => setWordLengthTimingFactor(value[0])}
+                          />
+                          <p className="text-sm text-muted-foreground">
+                            Higher values will make the pause difference between short and long words more pronounced
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
@@ -768,6 +980,38 @@ const speak = (text: string, index: number) => {
                         </Select>
                         <p className="text-sm text-muted-foreground">Choose a voice for speech synthesis</p>
                       </div>
+                      
+                      <div className="mt-4">
+                        <Button 
+                          onClick={() => {
+                            if (!speechSynthesis) return;
+                            
+                            // Cancel any ongoing speech
+                            speechSynthesis.cancel();
+                            
+                            // Create a sample utterance
+                            const utterance = new SpeechSynthesisUtterance(
+                              "This is a preview of the selected voice. It will be used for reading math expressions."
+                            );
+                            
+                            // Set the selected voice
+                            if (selectedVoice) {
+                              const voice = availableVoices.find(v => v.name === selectedVoice);
+                              if (voice) {
+                                utterance.voice = voice;
+                              }
+                            }
+                            
+                            // Set the rate
+                            utterance.rate = rate;
+                            
+                            // Speak the sample text
+                            speechSynthesis.speak(utterance);
+                          }}
+                        >
+                          Test Voice
+                        </Button>
+                      </div>
                     </div>
                   </TabsContent>
 
@@ -780,7 +1024,7 @@ const speak = (text: string, index: number) => {
                         </p>
                       </div>
 
-                      <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-4`}>
                         <Button
                           onClick={() => {
                             // Create configuration object
@@ -794,6 +1038,13 @@ const speak = (text: string, index: number) => {
                               },
                               pauseSettings,
                               selectedVoice,
+                              announceNewLines,
+                              autoScroll,
+                              wordLengthSettings: {
+                                useWordLengthTiming,
+                                wordLengthTimingFactor
+                              },
+                              rate
                             }
 
                             // Convert to JSON string
@@ -863,6 +1114,31 @@ const speak = (text: string, index: number) => {
                                     if (voiceExists) {
                                       setSelectedVoice(config.selectedVoice)
                                     }
+                                  }
+                                  
+                                  // Import announceNewLines setting if it exists
+                                  if (config.announceNewLines !== undefined) {
+                                    setAnnounceNewLines(config.announceNewLines)
+                                  }
+                                  
+                                  // Import auto-scroll setting if it exists
+                                  if (config.autoScroll !== undefined) {
+                                    setAutoScroll(config.autoScroll)
+                                  }
+                                  
+                                  // Import word length timing settings if they exist
+                                  if (config.wordLengthSettings) {
+                                    if (config.wordLengthSettings.useWordLengthTiming !== undefined) {
+                                      setUseWordLengthTiming(config.wordLengthSettings.useWordLengthTiming)
+                                    }
+                                    if (config.wordLengthSettings.wordLengthTimingFactor !== undefined) {
+                                      setWordLengthTimingFactor(config.wordLengthSettings.wordLengthTimingFactor)
+                                    }
+                                  }
+                                  
+                                  // Import rate if it exists
+                                  if (config.rate !== undefined) {
+                                    setRate(config.rate)
                                   }
                                   
                                   alert("Settings imported successfully!")

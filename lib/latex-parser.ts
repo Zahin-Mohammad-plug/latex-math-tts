@@ -101,10 +101,10 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\mathbb{P}": "probability",
   "\\mathbb{V}": "variance",
   "\\mathbb{C}": "covariance",
-  "\\mathcal{N}": "normal distribution",
-  "\\mathcal{U}": "uniform distribution",
-  "\\mathcal{B}": "binomial distribution",
-  "\\mathcal{P}": "poisson distribution",
+  "\\mathcal{N}": "normal-distribution",
+  "\\mathcal{U}": "uniform-distribution",
+  "\\mathcal{B}": "binomial-distribution",
+  "\\mathcal{P}": "poisson-distribution",
   "\\mathcal{F}": "F distribution",
   "\\mathcal{T}": "t distribution",
   "\\mathcal{X}": "chi-squared distribution",
@@ -137,9 +137,9 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\tau": "tau",
   "\\upsilon": "upsilon",
   "\\phi": "phi",
-  "\\chi": "chi",
-  "\\psi": "psi",
-  "\\omega": "omega",
+  "\\chi": "chi lowercase",
+  "\\psi": "psi lowercase",
+  "\\omega": "omega lowercase",
   // Uppercase Greek letters
   "\\Alpha": "capital alpha",
   "\\Beta": "capital beta",
@@ -162,9 +162,9 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\Tau": "capital tau",
   "\\Upsilon": "capital upsilon",
   "\\Phi": "capital phi",
-  "\\Chi": "chi",
-  "\\Psi": "psi",
-  "\\Omega": "omega",
+  "\\Chi": "capital chi",
+  "\\Psi": "capital psi",
+  "\\Omega": "capital omega",
   // Symbols
   "\\approx": "approximately equal to",
   "\\neq": "not equal to",
@@ -232,7 +232,7 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\iint": "double integral",
   "\\iiint": "triple integral",
   // Distributions
-  N: "normal distribution",
+  N: "normal-distribution",
   // Subscripts and superscripts
   _: "subscript",
   "^": "superscript",
@@ -334,7 +334,7 @@ export function parseLatex(
       processed = processed.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, (match, numerator, denominator) => {
         fractionLevel++
         const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-        return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
+        return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
       })
 
       // Process fractions with already processed content (nested fractions)
@@ -343,7 +343,7 @@ export function parseLatex(
         (match, numerator, denominator) => {
           fractionLevel++
           const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
+          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
         },
       )
 
@@ -352,7 +352,7 @@ export function parseLatex(
         (match, numerator, denominator) => {
           fractionLevel++
           const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
+          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
         },
       )
     }
@@ -587,6 +587,9 @@ export function parseLatex(
   result = result.replace(/-\\bar\{X\}/g, "minus-bar-X")
   result = result.replace(/-\\bar\{x\}/g, "minus-bar-x")
   
+  // Remove backslashes before LaTeX delimiters so they're not read out loud
+  result = result.replace(/\\(\[|\]|\(|\))/g, "$1")
+  
   // Process distribution notation
   result = result.replace(/([A-Za-z])\s*~\s*([^(]+)\(([^)]+)\)/g, "$1 is distributed as $2 with parameters $3")
   result = result.replace(/([A-Za-z])\s*~\s*([^(]+)/g, "$1 is distributed as $2")
@@ -594,11 +597,17 @@ export function parseLatex(
   // Process equals signs
   result = result.replace(/=/g, "symbol-of-equals")
   
+  // Handle decimal points to be read as a whole number
+  result = result.replace(/(\d+)\.(\d+)/g, "$1 point $2")
+  
+  // Announce periods
+  result = result.replace(/\./g, " period ")
+  
   // Process text in math mode
   result = result.replace(/\\text\{([^{}]*)\}/g, "text $1")
 
-  // Fix comma handling to prevent SSML issues
-  result = result.replace(/,/g, "comma")
+  // Fix comma handling to prevent SSML issues and add spaces
+  result = result.replace(/,/g, " comma ")
 
   // Clean up any remaining LaTeX commands (simplified approach)
   result = result.replace(/\\[a-zA-Z]+/g, (match) => {
