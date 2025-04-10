@@ -616,12 +616,12 @@ export function parseLatex(
   result = result.replace(/\\qquad/g, " double-space ")
   
   // Process statistical notation
-  result = result.replace(/E\s*\[\s*([^\]]*)\s*\]/g, "expectation of $1")
-  result = result.replace(/E\s*\(\s*([^)]*)\s*\)/g, "expectation of $1")
-  result = result.replace(/Var\s*\(\s*([^)]*)\s*\)/g, "variance of $1")
-  result = result.replace(/Cov\s*\(\s*([^,]*)\s*,\s*([^)]*)\s*\)/g, "covariance of $1 and $2")
-  result = result.replace(/P\s*\(\s*([^)]*)\s*\)/g, "probability of $1")
-  result = result.replace(/P\s*\(\s*([^|]*)\s*\|\s*([^)]*)\s*\)/g, "probability of $1 given $2")
+  // result = result.replace(/E\s*\[\s*([^\]]*)\s*\]/g, "expectation of $1")
+  // result = result.replace(/E\s*\(\s*([^)]*)\s*\)/g, "expectation of $1")
+  // result = result.replace(/Var\s*\(\s*([^)]*)\s*\)/g, "variance of $1")
+  // result = result.replace(/Cov\s*\(\s*([^,]*)\s*,\s*([^)]*)\s*\)/g, "covariance of $1 and $2")
+  // result = result.replace(/P\s*\(\s*([^)]*)\s*\)/g, "probability of $1")
+  // result = result.replace(/P\s*\(\s*([^|]*)\s*\|\s*([^)]*)\s*\)/g, "probability of $1 given $2")
 
   // Process decorations like \bar{X}
   result = result.replace(/\\bar\{([^{}]*)\}/g, (match, content) => {
