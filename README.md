@@ -34,7 +34,7 @@ Math TTS combines the power of custom LaTeX parsing with granular Text-to-Speech
 2. **Install Dependencies:**
 
    ```bash
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 3. **Run the Development Server:**
