@@ -63,6 +63,7 @@ export default function MathTTS() {
     operators: true,
     comparison: true,
     sets: true,
+    statistics: true,
     other: false,
   })
 
@@ -465,7 +466,7 @@ const speak = (text: string, index: number) => {
                 </SheetHeader>
 
                 <Tabs defaultValue="mappings" className="mt-6">
-                  <TabsList className="grid w-full grid-cols-5">
+                  <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="mappings" className="text-xs sm:text-sm">
                       Mappings
                     </TabsTrigger>
@@ -480,6 +481,9 @@ const speak = (text: string, index: number) => {
                     </TabsTrigger>
                     <TabsTrigger value="voice" className="text-xs sm:text-sm">
                       Voice
+                    </TabsTrigger>
+                    <TabsTrigger value="config" className="text-xs sm:text-sm">
+                      Config
                     </TabsTrigger>
                   </TabsList>
 
@@ -622,6 +626,16 @@ const speak = (text: string, index: number) => {
                                 />
                               </div>
                               <div className="flex items-center justify-between">
+                                <Label htmlFor="prefix-statistics" className="cursor-pointer">
+                                  Statistics (E, P, Var)
+                                </Label>
+                                <Switch
+                                  id="prefix-statistics"
+                                  checked={prefixCategories.statistics}
+                                  onCheckedChange={() => togglePrefixCategory("statistics")}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between">
                                 <Label htmlFor="prefix-other" className="cursor-pointer">
                                   Other symbols
                                 </Label>
@@ -753,6 +767,117 @@ const speak = (text: string, index: number) => {
                           </SelectContent>
                         </Select>
                         <p className="text-sm text-muted-foreground">Choose a voice for speech synthesis</p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="config" className="space-y-6 mt-4">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-medium">Configuration Management</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Export your current settings to a file or import settings from a previously exported file.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-4 sm:flex-row">
+                        <Button
+                          onClick={() => {
+                            // Create configuration object
+                            const config = {
+                              latexMappings,
+                              symbolSettings: {
+                                useSymbolPrefix,
+                                symbolPrefix,
+                                prefixCategories,
+                                groupSymbols,
+                              },
+                              pauseSettings,
+                              selectedVoice,
+                            }
+
+                            // Convert to JSON string
+                            const configJson = JSON.stringify(config, null, 2)
+
+                            // Create blob and download link
+                            const blob = new Blob([configJson], { type: "application/json" })
+                            const url = URL.createObjectURL(blob)
+                            const a = document.createElement("a")
+                            a.href = url
+                            a.download = "math-tts-config.json"
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
+                            URL.revokeObjectURL(url)
+                          }}
+                        >
+                          Export Settings
+                        </Button>
+
+                        <div className="flex-1">
+                          <Label htmlFor="import-config" className="block mb-2">
+                            Import Settings
+                          </Label>
+                          <Input
+                            id="import-config"
+                            type="file"
+                            accept=".json"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+
+                              const reader = new FileReader()
+                              reader.onload = (event) => {
+                                try {
+                                  const config = JSON.parse(event.target?.result as string)
+                                  
+                                  // Apply imported settings
+                                  if (config.latexMappings) {
+                                    setLatexMappings(config.latexMappings)
+                                  }
+                                  
+                                  if (config.symbolSettings) {
+                                    if (config.symbolSettings.useSymbolPrefix !== undefined) {
+                                      setUseSymbolPrefix(config.symbolSettings.useSymbolPrefix)
+                                    }
+                                    if (config.symbolSettings.symbolPrefix) {
+                                      setSymbolPrefix(config.symbolSettings.symbolPrefix)
+                                    }
+                                    if (config.symbolSettings.prefixCategories) {
+                                      setPrefixCategories(config.symbolSettings.prefixCategories)
+                                    }
+                                    if (config.symbolSettings.groupSymbols !== undefined) {
+                                      setGroupSymbols(config.symbolSettings.groupSymbols)
+                                    }
+                                  }
+                                  
+                                  if (config.pauseSettings) {
+                                    setPauseSettings(config.pauseSettings)
+                                  }
+                                  
+                                  if (config.selectedVoice) {
+                                    // Only set the voice if it exists in available voices
+                                    const voiceExists = availableVoices.some(
+                                      (voice) => voice.name === config.selectedVoice
+                                    )
+                                    if (voiceExists) {
+                                      setSelectedVoice(config.selectedVoice)
+                                    }
+                                  }
+                                  
+                                  alert("Settings imported successfully!")
+                                } catch (error) {
+                                  console.error("Error importing settings:", error)
+                                  alert("Error importing settings. Please check the file format.")
+                                }
+                              }
+                              reader.readAsText(file)
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Select a previously exported configuration file (.json)
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </TabsContent>

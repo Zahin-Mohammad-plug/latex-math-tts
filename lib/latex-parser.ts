@@ -1,6 +1,6 @@
 // lib\latex-parser.ts
 // Symbol categories for prefix application
-export type SymbolCategory = "greek" | "operators" | "comparison" | "sets" | "other"
+export type SymbolCategory = "greek" | "operators" | "comparison" | "sets" | "statistics" | "other"
 
 // Symbol categorization
 const symbolCategories: Record<string, SymbolCategory> = {
@@ -77,12 +77,44 @@ const symbolCategories: Record<string, SymbolCategory> = {
   "\\div": "operators",
   "\\cdot": "operators",
   "\\ast": "operators",
+  // Statistics symbols
+  "\\mathbb{E}": "statistics",
+  "\\mathbb{P}": "statistics",
+  "\\mathbb{V}": "statistics",
+  "\\mathbb{C}": "statistics",
+  "\\mathcal{N}": "statistics",
+  "\\mathcal{U}": "statistics",
+  "\\mathcal{B}": "statistics",
+  "\\mathcal{P}": "statistics",
+  "\\mathcal{F}": "statistics",
+  "\\mathcal{T}": "statistics",
+  "\\mathcal{X}": "statistics",
+  "\\chi": "statistics",
 }
 
 // Default LaTeX to speech translation mappings
 export const defaultLatexMappings: Record<string, string> = {
   // Fractions
   "\\frac": "start fraction where numerator equals",
+  // Statistics
+  "\\mathbb{E}": "expectation",
+  "\\mathbb{P}": "probability",
+  "\\mathbb{V}": "variance",
+  "\\mathbb{C}": "covariance",
+  "\\mathcal{N}": "normal distribution",
+  "\\mathcal{U}": "uniform distribution",
+  "\\mathcal{B}": "binomial distribution",
+  "\\mathcal{P}": "poisson distribution",
+  "\\mathcal{F}": "F distribution",
+  "\\mathcal{T}": "t distribution",
+  "\\mathcal{X}": "chi-squared distribution",
+  "\\chi^2": "chi-squared",
+  // Distribution notation
+  "\\sim": "distributed as",
+  "\\mid": "given",
+  "\\vert": "given",
+  "\\lvert": "given",
+  "\\rvert": "end given",
   // Greek letters
   "\\alpha": "alpha",
   "\\beta": "beta",
@@ -134,7 +166,6 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\Psi": "psi",
   "\\Omega": "omega",
   // Symbols
-  "\\sim": "tilde symbol",
   "\\approx": "approximately equal to",
   "\\neq": "not equal to",
   "\\leq": "less than or equal to",
@@ -245,6 +276,7 @@ export function parseLatex(
       operators: true,
       comparison: true,
       sets: true,
+      statistics: true,
       other: false,
     },
     groupSymbols: true,
@@ -272,7 +304,7 @@ export function parseLatex(
     })
 
     // Extract raw LaTeX expressions (not in $ delimiters)
-    input.replace(/\\Bigg$$.*?\\Bigg$$/gs, (match) => {
+    input.replace(/\\Bigg\$\$.*?\\Bigg\$\$/g, (match) => {
       equations.push(match)
       return match
     })
@@ -301,7 +333,7 @@ export function parseLatex(
       // Process innermost fractions first
       processed = processed.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, (match, numerator, denominator) => {
         fractionLevel++
-        const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : "third"
+        const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
         return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
       })
 
@@ -310,7 +342,7 @@ export function parseLatex(
         /\\frac\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}\{(.*?)\}/g,
         (match, numerator, denominator) => {
           fractionLevel++
-          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : "third"
+          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
           return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
         },
       )
@@ -319,7 +351,7 @@ export function parseLatex(
         /\\frac\{(.*?)\}\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}/g,
         (match, numerator, denominator) => {
           fractionLevel++
-          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : "third"
+          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
           return `start-${fractionType}-fraction-where-the-numerator-is ${numerator}, and-the-${fractionType}-fraction-denominator-is ${denominator}, end-${fractionType}-fraction`
         },
       )
@@ -330,50 +362,175 @@ export function parseLatex(
 
   result = processFractions(result)
 
-  // Process square roots
-  result = result.replace(/\\sqrt\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, content) => {
-    return `symbol-of-square-root-of ${content}`
-  })
+  // Process nested square roots
+  const processSquareRoots = (input: string): string => {
+    let processed = input
+    let lastProcessed = ""
+    let rootLevel = 0
 
-  // Process nth roots
-  result = result.replace(/\\sqrt\[([^[\]]*)\]\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, n, content) => {
-    return `${n}th-root-of ${content}`
-  })
+    // Keep processing until no more changes are made
+    while (processed !== lastProcessed) {
+      lastProcessed = processed
 
-  // Process subscripts
-  result = result.replace(/_\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, content) => {
-    return ` start-subscript, ${content}, end-subscript`
-  })
+      // Process innermost square roots first
+      processed = processed.replace(/\\sqrt\{([^{}]*)\}/g, (match, content) => {
+        rootLevel++
+        const rootType = rootLevel === 1 ? "outer" : rootLevel === 2 ? "inner" : rootLevel === 3 ? "innermost" : "deepest"
+        return `${rootType}-square-root-of ${content}`
+      })
 
-  // Process simple subscripts like x_i
-  result = result.replace(/_([a-zA-Z0-9])/g, (match, content) => {
-    return ` start-subscript ${content} end-subscript`
-  })
+      // Process square roots with already processed content (nested roots)
+      processed = processed.replace(
+        /\\sqrt\{(.*?square-root-of.*?)\}/g,
+        (match, content) => {
+          rootLevel++
+          const rootType = rootLevel === 1 ? "outer" : rootLevel === 2 ? "inner" : rootLevel === 3 ? "innermost" : "deepest"
+          return `${rootType}-square-root-of ${content}`
+        }
+      )
+    }
 
-  // Process superscripts
-  result = result.replace(/\^\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, content) => {
-    return ` start-superscript, ${content}, end-superscript`
-  })
+    return processed
+  }
 
-  // Process simple superscripts like x^2
-  result = result.replace(/\^([a-zA-Z0-9])/g, (match, content) => {
-    return ` start-superscript ${content} end-superscript`
-  })
+  // Process nth roots with nesting
+  const processNthRoots = (input: string): string => {
+    let processed = input
+    let lastProcessed = ""
+    let rootLevel = 0
+
+    // Keep processing until no more changes are made
+    while (processed !== lastProcessed) {
+      lastProcessed = processed
+
+      // Process innermost nth roots first
+      processed = processed.replace(/\\sqrt\[([^[\]]*)\]\{([^{}]*)\}/g, (match, n, content) => {
+        rootLevel++
+        const rootType = rootLevel === 1 ? "outer" : rootLevel === 2 ? "inner" : rootLevel === 3 ? "innermost" : "deepest"
+        return `${rootType}-${n}th-root-of ${content}`
+      })
+
+      // Process nth roots with already processed content
+      processed = processed.replace(
+        /\\sqrt\[([^[\]]*)\]\{(.*?root-of.*?)\}/g,
+        (match, n, content) => {
+          rootLevel++
+          const rootType = rootLevel === 1 ? "outer" : rootLevel === 2 ? "inner" : rootLevel === 3 ? "innermost" : "deepest"
+          return `${rootType}-${n}th-root-of ${content}`
+        }
+      )
+    }
+
+    return processed
+  }
+
+  // Apply square root and nth root processing
+  result = processSquareRoots(result)
+  result = processNthRoots(result)
+
+  // Process nested subscripts
+  const processSubscripts = (input: string): string => {
+    let processed = input
+    let lastProcessed = ""
+    
+    // Keep processing until no more changes are made
+    while (processed !== lastProcessed) {
+      lastProcessed = processed
+      
+      // Process complex subscripts with braces
+      processed = processed.replace(/_\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, content) => {
+        // Check if content already contains subscript markers
+        if (content.includes("start-subscript")) {
+          return ` start-outer-subscript, ${content}, end-outer-subscript`
+        } else {
+          return ` start-subscript, ${content}, end-subscript`
+        }
+      })
+      
+      // Process simple subscripts like x_i
+      processed = processed.replace(/_([a-zA-Z0-9])/g, (match, content) => {
+        return ` start-subscript ${content} end-subscript`
+      })
+    }
+    
+    return processed
+  }
+  
+  // Process nested superscripts
+  const processSuperscripts = (input: string): string => {
+    let processed = input
+    let lastProcessed = ""
+    
+    // Keep processing until no more changes are made
+    while (processed !== lastProcessed) {
+      lastProcessed = processed
+      
+      // Process complex superscripts with braces
+      processed = processed.replace(/\^\{([^{}]*(\{[^{}]*\})*[^{}]*)\}/g, (match, content) => {
+        // Check if content already contains superscript markers
+        if (content.includes("start-superscript")) {
+          return ` start-outer-superscript, ${content}, end-outer-superscript`
+        } else {
+          return ` start-superscript, ${content}, end-superscript`
+        }
+      })
+      
+      // Process simple superscripts like x^2
+      processed = processed.replace(/\^([a-zA-Z0-9])/g, (match, content) => {
+        return ` start-superscript ${content} end-superscript`
+      })
+    }
+    
+    return processed
+  }
+  
+  // Apply subscript and superscript processing
+  result = processSubscripts(result)
+  result = processSuperscripts(result)
 
   // Process summation with limits
   result = result.replace(/\\sum_\{([^{}]*)\}\^\{([^{}]*)\}/g, (match, lower, upper) => {
-    return `symbol-of-summation, start-subscript, ${lower}, end-subscript, start-superscript, ${upper}, end-superscript`
+    return `symbol-of-summation, from start-subscript, ${lower}, end-subscript, to start-superscript, ${upper}, end-superscript`
+  })
+  
+  // Process product with limits
+  result = result.replace(/\\prod_\{([^{}]*)\}\^\{([^{}]*)\}/g, (match, lower, upper) => {
+    return `symbol-of-product, from start-subscript, ${lower}, end-subscript, to start-superscript, ${upper}, end-superscript`
+  })
+  
+  // Process limits
+  result = result.replace(/\\lim_\{([^{}]*)\}/g, (match, lower) => {
+    return `limit as start-subscript, ${lower}, end-subscript`
+  })
+  
+  // Process integrals with limits
+  result = result.replace(/\\int_\{([^{}]*)\}\^\{([^{}]*)\}/g, (match, lower, upper) => {
+    return `integral from start-subscript, ${lower}, end-subscript, to start-superscript, ${upper}, end-superscript`
   })
 
-  // Process large parentheses
+  // Process nested parentheses with levels
+  result = result.replace(/\\left\(/g, "Open-outer-parenthesis")
+  result = result.replace(/\\right\)/g, "Close-outer-parenthesis")
   result = result.replace(/\\Bigg\(/g, "Open-first-large-parenthesis")
   result = result.replace(/\\Bigg\)/g, "Close-first-large-parenthesis")
   result = result.replace(/\\bigg\(/g, "Open-second-large-parenthesis")
   result = result.replace(/\\bigg\)/g, "Close-second-large-parenthesis")
+  result = result.replace(/\\Big\(/g, "Open-third-large-parenthesis")
+  result = result.replace(/\\Big\)/g, "Close-third-large-parenthesis")
+  result = result.replace(/\\big\(/g, "Open-fourth-large-parenthesis")
+  result = result.replace(/\\big\)/g, "Close-fourth-large-parenthesis")
 
   // Process quad spacing
   result = result.replace(/\\quad/g, " space ")
   result = result.replace(/\\qquad/g, " double-space ")
+  
+  // Process statistical notation
+  result = result.replace(/E\s*\[\s*([^\]]*)\s*\]/g, "expectation of $1")
+  result = result.replace(/E\s*\(\s*([^)]*)\s*\)/g, "expectation of $1")
+  result = result.replace(/Var\s*\(\s*([^)]*)\s*\)/g, "variance of $1")
+  result = result.replace(/Cov\s*\(\s*([^,]*)\s*,\s*([^)]*)\s*\)/g, "covariance of $1 and $2")
+  result = result.replace(/P\s*\(\s*([^)]*)\s*\)/g, "probability of $1")
+  result = result.replace(/P\s*\(\s*([^|]*)\s*\|\s*([^)]*)\s*\)/g, "probability of $1 given $2")
 
   // Process decorations like \bar{X}
   result = result.replace(/\\bar\{([^{}]*)\}/g, (match, content) => {
@@ -382,6 +539,14 @@ export function parseLatex(
 
   result = result.replace(/\\hat\{([^{}]*)\}/g, (match, content) => {
     return `${content} with-hat`
+  })
+  
+  result = result.replace(/\\tilde\{([^{}]*)\}/g, (match, content) => {
+    return `${content} with-tilde`
+  })
+  
+  result = result.replace(/\\vec\{([^{}]*)\}/g, (match, content) => {
+    return `${content} vector`
   })
 
   // Process simple commands using custom mappings
@@ -421,9 +586,16 @@ export function parseLatex(
   result = result.replace(/\\bar\{x\}/g, "bar-x")
   result = result.replace(/-\\bar\{X\}/g, "minus-bar-X")
   result = result.replace(/-\\bar\{x\}/g, "minus-bar-x")
+  
+  // Process distribution notation
+  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)\(([^)]+)\)/g, "$1 is distributed as $2 with parameters $3")
+  result = result.replace(/([A-Za-z])\s*~\s*([^(]+)/g, "$1 is distributed as $2")
 
   // Process equals signs
   result = result.replace(/=/g, "symbol-of-equals")
+  
+  // Process text in math mode
+  result = result.replace(/\\text\{([^{}]*)\}/g, "text $1")
 
   // Fix comma handling to prevent SSML issues
   result = result.replace(/,/g, "comma")
@@ -433,12 +605,26 @@ export function parseLatex(
     return match.substring(1) // Remove the backslash
   })
 
-  // Add special handling for complex equations
-  if (text.includes("\\Bigg(") && text.includes("\\sigma_{\\bar{X}}")) {
-    // This is the specific complex equation the user mentioned
-    result =
-      "The answer is: Open-first-large-parenthesis. Start-first-fraction-where-the-numerator-is-the symbol-of-summation, start-subscript, i symbol-of-equals one, end-subscript, start-superscript, n, end-superscript, x start-subscript i end-subscript and-the-first-fraction-denominator-is n end-first-fraction. comma. symbol-of-sigma start-subscript bar X, end-subscript, symbol-of-equals start-first-fraction-where-the-numerator-is symbol-of-sigma and-the-denominator-of-first-fraction-is-the symbol-of-square-root-of n, end-first-fraction; equals start-first-fraction-where-the-numerator-is-the symbol-of-square-root-of start-second-fraction-where-the-numerator-is-the symbol-of-summation, start-subscript, i symbol-of-equals one, end-subscript, start-superscript, n, end-superscript, open-second-parenthesis, x start-subscript i, end-subscript, symbol-of-minus bar X, close-second-parenthesis, start-superscript 2, end-superscript, and-the-first fraction-denominator-is n symbol-of-minus one, end-second-fraction, and the second fraction denominator is the symbol-of-square-root-of n, end-first-fraction. Close-first-large-parenthesis."
-  }
+  // Process cases/piecewise functions
+  result = result.replace(/\\begin\{cases\}(.*?)\\end\{cases\}/g, (match, content) => {
+    const cases = content.split('\\\\').filter(Boolean);
+    let result = "piecewise function where ";
+    
+    cases.forEach((caseItem: string, index: number) => {
+      const parts = caseItem.split('&');
+      if (parts.length >= 2) {
+        result += `case ${index + 1}: ${parts[0].trim()} when ${parts[1].trim()}`;
+        if (index < cases.length - 1) {
+          result += ", and ";
+        }
+      }
+    });
+    
+    return result;
+  });
+  
+  // Handle conditional probability better
+  result = result.replace(/\|/g, " given ");
 
   return { parsedText: result, equations: extractedEquations }
 }
