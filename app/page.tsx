@@ -103,8 +103,10 @@ export default function MathTTS() {
 
   // Word length-based timing
   const [useWordLengthTiming, setUseWordLengthTiming] = useState<boolean>(false)
-  
   const [wordLengthTimingFactor, setWordLengthTimingFactor] = useState<number>(10) // ms per character
+  const [minWordPause, setMinWordPause] = useState<number>(100) // minimum pause in ms
+  const [baseWordPause, setBaseWordPause] = useState<number>(200) // base pause in ms
+  const [maxWordPause, setMaxWordPause] = useState<number>(2000) // maximum pause in ms
 
   const speechSynthesis = typeof window !== "undefined" ? window.speechSynthesis : null
   const speechPreviewRef = useRef<HTMLDivElement>(null)
@@ -122,6 +124,9 @@ export default function MathTTS() {
       localStorage.setItem('mathTTS_autoScroll', String(autoScroll))
       localStorage.setItem('mathTTS_useWordLengthTiming', String(useWordLengthTiming))
       localStorage.setItem('mathTTS_wordLengthTimingFactor', String(wordLengthTimingFactor))
+      localStorage.setItem('mathTTS_minWordPause', String(minWordPause))
+      localStorage.setItem('mathTTS_baseWordPause', String(baseWordPause))
+      localStorage.setItem('mathTTS_maxWordPause', String(maxWordPause))
       
       // Also save selected voice if available
       if (selectedVoice) {
@@ -142,6 +147,9 @@ export default function MathTTS() {
     autoScroll,
     useWordLengthTiming,
     wordLengthTimingFactor,
+    minWordPause,
+    baseWordPause,
+    maxWordPause,
     selectedVoice,
     rate
   ])
@@ -248,6 +256,36 @@ export default function MathTTS() {
           console.error('Failed to parse saved word length timing factor', e)
         }
       }
+      
+      // Load min word pause
+      const savedMinWordPause = localStorage.getItem('mathTTS_minWordPause')
+      if (savedMinWordPause) {
+        try {
+          setMinWordPause(parseFloat(savedMinWordPause))
+        } catch (e) {
+          console.error('Failed to parse saved min word pause', e)
+        }
+      }
+      
+      // Load base word pause
+      const savedBaseWordPause = localStorage.getItem('mathTTS_baseWordPause')
+      if (savedBaseWordPause) {
+        try {
+          setBaseWordPause(parseFloat(savedBaseWordPause))
+        } catch (e) {
+          console.error('Failed to parse saved base word pause', e)
+        }
+      }
+      
+      // Load max word pause
+      const savedMaxWordPause = localStorage.getItem('mathTTS_maxWordPause')
+      if (savedMaxWordPause) {
+        try {
+          setMaxWordPause(parseFloat(savedMaxWordPause))
+        } catch (e) {
+          console.error('Failed to parse saved max word pause', e)
+        }
+      }
     }
   }, [])
 
@@ -288,12 +326,14 @@ export default function MathTTS() {
 const calculateWordPause = (word: string) => {
   if (!useWordLengthTiming) return pauseSettings.generalSpace;
   
-  // Base pause plus additional time per character
   // Ensure the word is not empty to avoid NaN
-  if (!word || word.trim().length === 0) return pauseSettings.generalSpace;
+  if (!word || word.trim().length === 0) return minWordPause;
   
   // Base pause plus additional time per character
-  return Math.max(10, Math.min(300, word.trim().length * wordLengthTimingFactor));
+  const calculatedPause = baseWordPause + (word.trim().length * wordLengthTimingFactor);
+  
+  // Apply minimum and maximum constraints
+  return Math.max(minWordPause, Math.min(maxWordPause, calculatedPause));
 };
 
 // Handle speech synthesis with custom pauses
@@ -970,20 +1010,70 @@ const speak = (text: string, index: number) => {
                       </p>
                       
                       {useWordLengthTiming && (
-                        <div className="space-y-2 mt-2">
-                          <div className="flex justify-between">
-                            <Label>Timing factor: {wordLengthTimingFactor}ms per character</Label>
+                        <div className="space-y-6 mt-2">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <Label>Timing factor: {wordLengthTimingFactor}ms per character</Label>
+                            </div>
+                            <Slider
+                              value={[wordLengthTimingFactor]}
+                              min={5}
+                              max={100}
+                              step={1}
+                              onValueChange={(value) => setWordLengthTimingFactor(value[0])}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Higher values will make the pause difference between short and long words more pronounced
+                            </p>
                           </div>
-                          <Slider
-                            value={[wordLengthTimingFactor]}
-                            min={5}
-                            max={30}
-                            step={1}
-                            onValueChange={(value) => setWordLengthTimingFactor(value[0])}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            Higher values will make the pause difference between short and long words more pronounced
-                          </p>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <Label>Base pause: {baseWordPause}ms</Label>
+                            </div>
+                            <Slider
+                              value={[baseWordPause]}
+                              min={0}
+                              max={1000}
+                              step={10}
+                              onValueChange={(value) => setBaseWordPause(value[0])}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Fixed base pause added to every word before applying the character-based timing
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <Label>Minimum pause: {minWordPause}ms</Label>
+                            </div>
+                            <Slider
+                              value={[minWordPause]}
+                              min={0}
+                              max={500}
+                              step={10}
+                              onValueChange={(value) => setMinWordPause(value[0])}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Minimum pause duration for any word, regardless of length
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <Label>Maximum pause: {maxWordPause}ms</Label>
+                            </div>
+                            <Slider
+                              value={[maxWordPause]}
+                              min={500}
+                              max={5000}
+                              step={100}
+                              onValueChange={(value) => setMaxWordPause(value[0])}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Maximum pause duration for any word, regardless of length
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1069,7 +1159,10 @@ const speak = (text: string, index: number) => {
                               autoScroll,
                               wordLengthSettings: {
                                 useWordLengthTiming,
-                                wordLengthTimingFactor
+                                wordLengthTimingFactor,
+                                minWordPause,
+                                baseWordPause,
+                                maxWordPause
                               },
                               rate
                             }
@@ -1160,6 +1253,15 @@ const speak = (text: string, index: number) => {
                                     }
                                     if (config.wordLengthSettings.wordLengthTimingFactor !== undefined) {
                                       setWordLengthTimingFactor(config.wordLengthSettings.wordLengthTimingFactor)
+                                    }
+                                    if (config.wordLengthSettings.minWordPause !== undefined) {
+                                      setMinWordPause(config.wordLengthSettings.minWordPause)
+                                    }
+                                    if (config.wordLengthSettings.baseWordPause !== undefined) {
+                                      setBaseWordPause(config.wordLengthSettings.baseWordPause)
+                                    }
+                                    if (config.wordLengthSettings.maxWordPause !== undefined) {
+                                      setMaxWordPause(config.wordLengthSettings.maxWordPause)
                                     }
                                   }
                                   
