@@ -97,20 +97,20 @@ export const defaultLatexMappings: Record<string, string> = {
   // Fractions
   "\\frac": "start fraction where numerator equals",
   // Statistics
-  "\\mathbb{E}": "expectation",
-  "\\mathbb{P}": "probability",
-  "\\mathbb{V}": "variance",
-  "\\mathbb{C}": "covariance",
-  "\\mathcal{N}": "normal-distribution",
-  "\\mathcal{U}": "uniform-distribution",
-  "\\mathcal{B}": "binomial-distribution",
-  "\\mathcal{P}": "poisson-distribution",
-  "\\mathcal{F}": "F distribution",
-  "\\mathcal{T}": "t distribution",
-  "\\mathcal{X}": "chi-squared distribution",
+  "\\mathbb{E}": "capital-E",
+  "\\mathbb{P}": "capital-P",
+  "\\mathbb{V}": "capital-V",
+  "\\mathbb{C}": "capital-C",
+  "\\mathcal{N}": "capital-N",
+  "\\mathcal{U}": "capital-U",
+  "\\mathcal{B}": "capital-B",
+  "\\mathcal{P}": "capital-P",
+  "\\mathcal{F}": "capital-F",
+  "\\mathcal{T}": "capital-T",
+  "\\mathcal{X}": "capital-X",
   "\\chi^2": "chi-squared",
   // Distribution notation
-  "\\sim": "distributed as",
+  "\\sim": "distributed-as",
   "\\approx": "approx-equal-to",
   "\\mid": "given",
   "\\vert": "given",
@@ -233,7 +233,7 @@ export const defaultLatexMappings: Record<string, string> = {
   "\\iint": "double integral",
   "\\iiint": "triple integral",
   // Distributions
-  N: "normal-distribution",
+  N: "Capital-N",
   // Subscripts and superscripts
   _: "subscript",
   "^": "superscript",
@@ -325,41 +325,57 @@ export function parseLatex(
   const processFractions = (input: string): string => {
     let processed = input
     let lastProcessed = ""
-    let fractionLevel = 0
-
+    
     // Keep processing until no more changes are made
     while (processed !== lastProcessed) {
       lastProcessed = processed
-
-      // Process innermost fractions first
+      
+      // Track nesting depth for each fraction
+      // Process innermost fractions first (those without nested fractions inside them)
       processed = processed.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, (match, numerator, denominator) => {
-        fractionLevel++
-        const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-        return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
-      })
+        // Determine nesting level by counting existing fraction markers in the context
+        const contextBefore = processed.substring(0, processed.indexOf(match));
+        const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;
+        
+        // Determine fraction type based on nesting level
+        const fractionType = nestingLevel === 0 ? "first" : nestingLevel === 1 ? "second" : nestingLevel === 2 ? "third" : "fourth";
+        
+        return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`;
+      });
 
-      // Process fractions with already processed content (nested fractions)
+      // Process fractions with already processed content in numerator (nested fractions)
       processed = processed.replace(
         /\\frac\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}\{(.*?)\}/g,
         (match, numerator, denominator) => {
-          fractionLevel++
-          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
+          // Determine nesting level by counting existing fraction markers in the context
+          const contextBefore = processed.substring(0, processed.indexOf(match));
+          const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;
+          
+          // Determine fraction type based on nesting level
+          const fractionType = nestingLevel === 0 ? "first" : nestingLevel === 1 ? "second" : nestingLevel === 2 ? "third" : "fourth";
+          
+          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`;
         },
-      )
+      );
 
+      // Process fractions with already processed content in denominator (nested fractions)
       processed = processed.replace(
         /\\frac\{(.*?)\}\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}/g,
         (match, numerator, denominator) => {
-          fractionLevel++
-          const fractionType = fractionLevel === 1 ? "first" : fractionLevel === 2 ? "second" : fractionLevel === 3 ? "third" : "fourth"
-          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`
+          // Determine nesting level by counting existing fraction markers in the context
+          const contextBefore = processed.substring(0, processed.indexOf(match));
+          const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;
+          
+          // Determine fraction type based on nesting level
+          const fractionType = nestingLevel === 0 ? "first" : nestingLevel === 1 ? "second" : nestingLevel === 2 ? "third" : "fourth";
+          
+          return `start-${fractionType}-fraction-where-the-numerator-is ${numerator} and-the-${fractionType}-fraction-denominator-is ${denominator} end-${fractionType}-fraction`;
         },
-      )
+      );
     }
 
-    return processed
-  }
+    return processed;
+  };
 
   result = processFractions(result)
 
@@ -509,17 +525,91 @@ export function parseLatex(
     return `integral from start-subscript, ${lower}, end-subscript, to start-superscript, ${upper}, end-superscript`
   })
 
-  // Process nested parentheses with levels
-  result = result.replace(/\\left\(/g, "Open-outer-parenthesis")
-  result = result.replace(/\\right\)/g, "Close-outer-parenthesis")
-  result = result.replace(/\\Bigg\(/g, "Open-first-large-parenthesis")
-  result = result.replace(/\\Bigg\)/g, "Close-first-large-parenthesis")
-  result = result.replace(/\\bigg\(/g, "Open-second-large-parenthesis")
-  result = result.replace(/\\bigg\)/g, "Close-second-large-parenthesis")
-  result = result.replace(/\\Big\(/g, "Open-third-large-parenthesis")
-  result = result.replace(/\\Big\)/g, "Close-third-large-parenthesis")
-  result = result.replace(/\\big\(/g, "Open-fourth-large-parenthesis")
-  result = result.replace(/\\big\)/g, "Close-fourth-large-parenthesis")
+  // Process nested parentheses with dynamic level tracking
+  const processParentheses = (input: string): string => {
+    let processed = input;
+    
+    // Process \left( and \right) pairs with nesting level tracking
+    const leftParenPattern = /\\left\(/g;
+    const rightParenPattern = /\\right\)/g;
+    
+    // First, mark all left parentheses with placeholders
+    let leftParenMatches: { index: number, length: number }[] = [];
+    let match;
+    while ((match = leftParenPattern.exec(processed)) !== null) {
+      leftParenMatches.push({ index: match.index, length: match[0].length });
+    }
+    
+    // Then mark all right parentheses with placeholders
+    let rightParenMatches: { index: number, length: number }[] = [];
+    while ((match = rightParenPattern.exec(processed)) !== null) {
+      rightParenMatches.push({ index: match.index, length: match[0].length });
+    }
+    
+    // Sort matches by index in reverse order to avoid changing indices when replacing
+    leftParenMatches.sort((a, b) => b.index - a.index);
+    rightParenMatches.sort((a, b) => b.index - a.index);
+    
+    // Replace with level-aware markers
+    // Create a stack to track nesting levels
+    let stack: number[] = [];
+    let levels: Record<number, number> = {}; // Maps right paren index to its nesting level
+    
+    // Process left parentheses from left to right to build the stack
+    leftParenMatches.sort((a, b) => a.index - b.index);
+    for (const leftParen of leftParenMatches) {
+      stack.push(leftParen.index);
+    }
+    
+    // Process right parentheses from left to right and pair with left parentheses
+    rightParenMatches.sort((a, b) => a.index - b.index);
+    for (const rightParen of rightParenMatches) {
+      if (stack.length > 0) {
+        const leftParenIndex = stack.pop()!;
+        const nestingLevel = stack.length; // Remaining stack size is the nesting level
+        levels[rightParen.index] = nestingLevel;
+      }
+    }
+    
+    // Reset stack for left parentheses processing
+    stack = [];
+    
+    // Now replace right parentheses first (in reverse order)
+    rightParenMatches.sort((a, b) => b.index - a.index);
+    for (const rightParen of rightParenMatches) {
+      const level = levels[rightParen.index] || 0;
+      const levelName = level === 0 ? "outer" : level === 1 ? "inner" : level === 2 ? "innermost" : "deepest";
+      processed = processed.substring(0, rightParen.index) + 
+                 `Close-${levelName}-parenthesis` + 
+                 processed.substring(rightParen.index + rightParen.length);
+    }
+    
+    // Then replace left parentheses (in reverse order)
+    leftParenMatches.sort((a, b) => b.index - a.index);
+    for (const leftParen of leftParenMatches) {
+      stack.push(leftParen.index);
+      const level = stack.length - 1;
+      const levelName = level === 0 ? "outer" : level === 1 ? "inner" : level === 2 ? "innermost" : "deepest";
+      processed = processed.substring(0, leftParen.index) + 
+                 `Open-${levelName}-parenthesis` + 
+                 processed.substring(leftParen.index + leftParen.length);
+    }
+    
+    // Process other parenthesis styles with appropriate nesting levels
+    processed = processed.replace(/\\Bigg\(/g, "Open-first-large-parenthesis");
+    processed = processed.replace(/\\Bigg\)/g, "Close-first-large-parenthesis");
+    processed = processed.replace(/\\bigg\(/g, "Open-second-large-parenthesis");
+    processed = processed.replace(/\\bigg\)/g, "Close-second-large-parenthesis");
+    processed = processed.replace(/\\Big\(/g, "Open-third-large-parenthesis");
+    processed = processed.replace(/\\Big\)/g, "Close-third-large-parenthesis");
+    processed = processed.replace(/\\big\(/g, "Open-fourth-large-parenthesis");
+    processed = processed.replace(/\\big\)/g, "Close-fourth-large-parenthesis");
+    
+    return processed;
+  };
+  
+  // Apply parentheses processing
+  result = processParentheses(result);
 
   // Process quad spacing
   result = result.replace(/\\quad/g, " space ")
