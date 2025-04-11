@@ -32,9 +32,7 @@ export function EquationDisplay({ latex }: EquationDisplayProps) {
         if (containerRef.current) {
           // First, set the content as HTML rather than textContent
           // This preserves both text and LaTeX structures
-          containerRef.current.innerHTML = latex
-            // Protect LaTeX delimiters from being interpreted as HTML
-            .replace(/\$/g, '\\$');
+          containerRef.current.innerHTML = latex;
             
           // Then render the math
           renderMathInElement(containerRef.current, {
