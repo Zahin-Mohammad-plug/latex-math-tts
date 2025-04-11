@@ -703,7 +703,7 @@ export function parseLatex(
   });
 
   // Process equals signs
-  result = result.replace(/=/g, "equals")
+  result = result.replace(/=/g, " equals ")
   
   // Handle minus signs in mathematical contexts
   // Replace minus signs in front of numbers (negative numbers)
