@@ -1,7 +1,7 @@
 // app\page.tsx
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Play,
   Pause,
@@ -15,6 +15,7 @@ import {
   Edit2,
   Eye,
   RotateCcw,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -30,6 +31,8 @@ import { parseLatex, defaultLatexMappings, type SymbolCategory } from "@/lib/lat
 import { EquationDisplay } from "@/components/equation-display"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { VersionDisplay } from "@/components/version-display"
+import { CheatSheet } from "@/components/cheat-sheet"
 
 export default function MathTTS() {
   const isMobile = useIsMobile()
@@ -46,6 +49,7 @@ export default function MathTTS() {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string>("")
   const [showOnlyEnglishVoices, setShowOnlyEnglishVoices] = useState<boolean>(true)
+  const [showCheatSheet, setShowCheatSheet] = useState<boolean>(false)
 
   // Settings state
   const [latexMappings, setLatexMappings] = useState<Record<string, string>>(() => {
@@ -700,6 +704,16 @@ const speak = (text: string, index: number) => {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Toggle preview</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setShowCheatSheet(!showCheatSheet)}>
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Symbol Cheat Sheet</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <Sheet>
@@ -1452,6 +1466,17 @@ const speak = (text: string, index: number) => {
           </div>
         </CardFooter>
       </Card>
+
+      {showCheatSheet && (
+        <div className="mt-8">
+          <CheatSheet 
+            latexMappings={latexMappings} 
+            onClose={() => setShowCheatSheet(false)} 
+          />
+        </div>
+      )}
+
+      <VersionDisplay />
     </div>
   )
 }
