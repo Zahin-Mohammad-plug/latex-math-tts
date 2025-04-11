@@ -154,7 +154,7 @@ export function CheatSheet({ latexMappings = defaultLatexMappings, onClose }: Ch
                     className="grid grid-cols-[auto_1fr_2fr] gap-2 p-2 border-t hover:bg-muted/50"
                   >
                     <div className="px-4 py-2 text-center">
-                      <EquationDisplay latex={`$${pair.command}$`} />
+                      <EquationDisplay latex={`${pair.command}`} />
                     </div>
                     <div className="px-4 py-2 font-mono">{pair.command}</div>
                     <div className="px-4 py-2">{pair.spoken}</div>
