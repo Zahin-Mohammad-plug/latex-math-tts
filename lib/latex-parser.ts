@@ -96,6 +96,7 @@ const symbolCategories: Record<string, SymbolCategory> = {
 export const defaultLatexMappings: Record<string, string> = {
   // Fractions
   "\\frac": "start fraction where numerator equals",
+  "\\tfrac": "start fraction where numerator equals",
   // Statistics
   "\\mathbb{E}": "capital-E",
   "\\mathbb{P}": "capital-P",
@@ -320,7 +321,50 @@ export function parseLatex(
 
   // Add "Starting a math equation" for display math mode
   result = result.replace(/\$\$(.*?)\$\$/g, "Starting a math equation, $1, end of equation")
-
+  
+  // Process text to announce letter case for single letters
+  const processLetterCase = (input: string): string => {
+    let processed = input;
+    
+    // Process letters within math delimiters \( and \)
+    processed = processed.replace(/\\(\(|\[)(.*?)\\(\)|\])/g, (match, openDelim, content, closeDelim) => {
+      // Replace single uppercase letters with "Capital X"
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      
+      // Don't modify letters that are already marked as capital
+      processedContent = processedContent.replace(/Capital Capital/g, "Capital");
+      
+      return `\\${openDelim}${processedContent}\\${closeDelim}`;
+    });
+    
+    // Process letters within $ delimiters
+    processed = processed.replace(/\$(.*?)\$/g, (match, content) => {
+      // Replace single uppercase letters with "Capital X"
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      
+      // Don't modify letters that are already marked as capital
+      processedContent = processedContent.replace(/Capital Capital/g, "Capital");
+      
+      return `$${processedContent}$`;
+    });
+    
+    // Process letters within $$ delimiters
+    processed = processed.replace(/\$\$(.*?)\$\$/g, (match, content) => {
+      // Replace single uppercase letters with "Capital X"
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      
+      // Don't modify letters that are already marked as capital
+      processedContent = processedContent.replace(/Capital Capital/g, "Capital");
+      
+      return `$$${processedContent}$$`;
+    });
+    
+    return processed;
+  };
+  
+  // Apply letter case processing
+  result = processLetterCase(result);
+  
   // Process nested fractions with multiple levels
   const processFractions = (input: string): string => {
     let processed = input
@@ -332,7 +376,7 @@ export function parseLatex(
       
       // Track nesting depth for each fraction
       // Process innermost fractions first (those without nested fractions inside them)
-      processed = processed.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, (match, numerator, denominator) => {
+      processed = processed.replace(/\\(frac|tfrac)\{([^{}]*)\}\{([^{}]*)\}/g, (match, command, numerator, denominator) => {
         // Determine nesting level by counting existing fraction markers in the context
         const contextBefore = processed.substring(0, processed.indexOf(match));
         const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;
@@ -345,8 +389,8 @@ export function parseLatex(
 
       // Process fractions with already processed content in numerator (nested fractions)
       processed = processed.replace(
-        /\\frac\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}\{(.*?)\}/g,
-        (match, numerator, denominator) => {
+        /\\(frac|tfrac)\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}\{(.*?)\}/g,
+        (match, command, numerator, denominator) => {
           // Determine nesting level by counting existing fraction markers in the context
           const contextBefore = processed.substring(0, processed.indexOf(match));
           const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;
@@ -360,8 +404,8 @@ export function parseLatex(
 
       // Process fractions with already processed content in denominator (nested fractions)
       processed = processed.replace(
-        /\\frac\{(.*?)\}\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}/g,
-        (match, numerator, denominator) => {
+        /\\(frac|tfrac)\{(.*?)\}\{(.*?start-.*?fraction.*?end-.*?fraction.*?)\}/g,
+        (match, command, numerator, denominator) => {
           // Determine nesting level by counting existing fraction markers in the context
           const contextBefore = processed.substring(0, processed.indexOf(match));
           const nestingLevel = (contextBefore.match(/start-.*?-fraction/g) || []).length;

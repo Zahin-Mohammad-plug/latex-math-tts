@@ -45,6 +45,7 @@ export default function MathTTS() {
   const [words, setWords] = useState<string[]>([])
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string>("")
+  const [showOnlyEnglishVoices, setShowOnlyEnglishVoices] = useState<boolean>(true)
 
   // Settings state
   const [latexMappings, setLatexMappings] = useState<Record<string, string>>(() => {
@@ -135,6 +136,7 @@ export default function MathTTS() {
       
       // Save rate
       localStorage.setItem('mathTTS_rate', String(rate))
+      localStorage.setItem('mathTTS_showOnlyEnglishVoices', String(showOnlyEnglishVoices))
     }
   }, [
     latexMappings, 
@@ -151,23 +153,38 @@ export default function MathTTS() {
     baseWordPause,
     maxWordPause,
     selectedVoice,
-    rate
+    rate,
+    showOnlyEnglishVoices
   ])
 
-  // Load available voices
+  // Load available voices with English prioritization
   useEffect(() => {
     if (!speechSynthesis) return
 
     const loadVoices = () => {
       const voices = speechSynthesis.getVoices()
-      setAvailableVoices(voices)
+      
+      // Sort voices to prioritize English voices
+      const sortedVoices = [...voices].sort((a, b) => {
+        // Check if voice language starts with 'en' (English)
+        const aIsEnglish = a.lang.startsWith('en')
+        const bIsEnglish = b.lang.startsWith('en')
+        
+        if (aIsEnglish && !bIsEnglish) return -1 // English voices first
+        if (!aIsEnglish && bIsEnglish) return 1
+        return 0 // Keep original order for same language category
+      })
+      
+      setAvailableVoices(sortedVoices)
 
-      // Try to restore saved voice or set default
+      // Try to restore saved voice or set default to first English voice
       const savedVoice = localStorage.getItem('mathTTS_selectedVoice')
-      if (savedVoice && voices.some(v => v.name === savedVoice)) {
+      if (savedVoice && sortedVoices.some(v => v.name === savedVoice)) {
         setSelectedVoice(savedVoice)
-      } else if (voices.length > 0 && !selectedVoice) {
-        setSelectedVoice(voices[0].name)
+      } else if (sortedVoices.length > 0 && !selectedVoice) {
+        // Find first English voice or use first available
+        const firstEnglishVoice = sortedVoices.find(v => v.lang.startsWith('en'))
+        setSelectedVoice(firstEnglishVoice ? firstEnglishVoice.name : sortedVoices[0].name)
       }
     }
 
@@ -285,6 +302,12 @@ export default function MathTTS() {
         } catch (e) {
           console.error('Failed to parse saved max word pause', e)
         }
+      }
+      
+      // Load English-only voices setting
+      const savedShowOnlyEnglishVoices = localStorage.getItem('mathTTS_showOnlyEnglishVoices')
+      if (savedShowOnlyEnglishVoices !== null) {
+        setShowOnlyEnglishVoices(savedShowOnlyEnglishVoices === 'false' ? false : true)
       }
     }
   }, [])
@@ -1081,18 +1104,34 @@ const speak = (text: string, index: number) => {
 
                   <TabsContent value="voice" className="space-y-6 mt-4">
                     <div className="space-y-4">
-                      <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="english-only">Show only English voices</Label>
+                        <Switch 
+                          id="english-only" 
+                          checked={showOnlyEnglishVoices} 
+                          onCheckedChange={setShowOnlyEnglishVoices} 
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, only English voices will be shown in the selection list
+                      </p>
+                      
+                      <div className="space-y-2 mt-4">
                         <Label htmlFor="voice-select">Select Voice</Label>
                         <Select value={selectedVoice} onValueChange={handleVoiceChange}>
                           <SelectTrigger id="voice-select">
                             <SelectValue placeholder="Select a voice" />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableVoices.map((voice) => (
-                              <SelectItem key={voice.name} value={voice.name}>
-                                {voice.name} ({voice.lang})
-                              </SelectItem>
-                            ))}
+                            {availableVoices
+                              .filter(voice => !showOnlyEnglishVoices || voice.lang.startsWith('en'))
+                              .map((voice) => (
+                                <SelectItem key={voice.name} value={voice.name}>
+                                  {voice.name} ({voice.lang})
+                                  {voice.lang.startsWith('en') && " 🇬🇧"}
+                                </SelectItem>
+                              ))
+                            }
                           </SelectContent>
                         </Select>
                         <p className="text-sm text-muted-foreground">Choose a voice for speech synthesis</p>
