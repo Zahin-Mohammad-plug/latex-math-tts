@@ -316,11 +316,15 @@ export function parseLatex(
 
   extractedEquations.push(...extractEquations(text))
 
-  // Add "Starting a math equation" for inline math mode
-  result = result.replace(/\$(.*?)\$/g, "Starting a math equation, $1, end of equation")
+  // Add "Starting a math equation" for inline math mode with a more distinctive announcement
+  result = result.replace(/\$(.*?)\$/g, (match, equation) => {
+    return `Beginning of inline math equation, ${equation}, end of equation`;
+  });
 
-  // Add "Starting a math equation" for display math mode
-  result = result.replace(/\$\$(.*?)\$\$/g, "Starting a math equation, $1, end of equation")
+  // Add "Starting a math equation" for display math mode with a more distinctive announcement
+  result = result.replace(/\$\$(.*?)\$\$/g, (match, equation) => {
+    return `Beginning of displayed math equation, ${equation}, end of equation`;
+  });
   
   // Process text to announce letter case for single letters
   const processLetterCase = (input: string): string => {
@@ -329,7 +333,7 @@ export function parseLatex(
     // Process letters within math delimiters \( and \)
     processed = processed.replace(/\\(\(|\[)(.*?)\\(\)|\])/g, (match, openDelim, content, closeDelim) => {
       // Replace single uppercase letters with "Capital X"
-      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital-$1");
       
       // Don't modify letters that are already marked as capital
       processedContent = processedContent.replace(/Capital Capital/g, "Capital");
@@ -340,7 +344,7 @@ export function parseLatex(
     // Process letters within $ delimiters
     processed = processed.replace(/\$(.*?)\$/g, (match, content) => {
       // Replace single uppercase letters with "Capital X"
-      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital-$1");
       
       // Don't modify letters that are already marked as capital
       processedContent = processedContent.replace(/Capital Capital/g, "Capital");
@@ -351,7 +355,7 @@ export function parseLatex(
     // Process letters within $$ delimiters
     processed = processed.replace(/\$\$(.*?)\$\$/g, (match, content) => {
       // Replace single uppercase letters with "Capital X"
-      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital $1");
+      let processedContent = content.replace(/\b([A-Z])\b/g, "Capital-$1");
       
       // Don't modify letters that are already marked as capital
       processedContent = processedContent.replace(/Capital Capital/g, "Capital");
@@ -749,14 +753,63 @@ export function parseLatex(
   // Process equals signs
   result = result.replace(/=/g, " equals ")
   
+  // Create a function to identify if we're inside a math context
+  const isInMathContext = (text: string, position: number): boolean => {
+    // Check if position is within any math delimiters
+    let inMath = false;
+    
+    // Check for $...$ delimiters
+    const inlineMathMatches = [...text.matchAll(/\$(.*?)\$/g)];
+    for (const match of inlineMathMatches) {
+      const start = match.index || 0;
+      const end = start + match[0].length;
+      if (position >= start && position < end) {
+        return true;
+      }
+    }
+    
+    // Check for $$...$$ delimiters
+    const displayMathMatches = [...text.matchAll(/\$\$(.*?)\$\$/g)];
+    for (const match of displayMathMatches) {
+      const start = match.index || 0;
+      const end = start + match[0].length;
+      if (position >= start && position < end) {
+        return true;
+      }
+    }
+    
+    // Check for "Beginning of ... math equation" markers (our added text)
+    if (text.substring(Math.max(0, position - 40), position).includes("Beginning of")) {
+      return true;
+    }
+    
+    return false;
+  };
+
   // Handle minus signs in mathematical contexts
-  // Replace minus signs in front of numbers (negative numbers)
-  result = result.replace(/-(\d+)/g, "negative $1")
-  // // Replace minus signs between terms (subtraction)
-  // result = result.replace(/(\w|\)|\})\s*-\s*(\w|\(|\{)/g, "$1 minus $2")
-  result = result.replace(/\s - /g, " dash ")
-  // Replace dash in other contexts (keep as dash)
-  result = result.replace(/\s-\s/g, " dash ")
+  // Replace minus signs in front of numbers (negative numbers) only in math contexts
+  result = result.replace(/-(\d+)/g, (match, number, offset) => {
+    if (isInMathContext(result, offset)) {
+      return `negative ${number}`;
+    }
+    return match; // Keep as-is if not in math context
+  });
+  
+  // Handle compound words with hyphens (like "calvin-klein" or "Z-table")
+  result = result.replace(/([a-zA-Z])-([a-zA-Z])/g, (match, before, after, offset) => {
+    if (isInMathContext(result, offset)) {
+      return `${before} minus ${after}`; // In math context, read as "minus"
+    }
+    return `${before}-${after}`; // In regular text, keep the hyphen
+  });
+  
+  // Replace spaces around hyphens with "dash" only in non-math contexts
+  result = result.replace(/\s-\s/g, (match, offset) => {
+    if (!isInMathContext(result, offset)) {
+      return " dash ";
+    }
+    return " minus "; // In math context, read as "minus"
+  });
   
   // Handle decimal points in numbers with more explicit language
   result = result.replace(/(\d+)\.(\d+)/g, "$1 point $2")
