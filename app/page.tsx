@@ -50,6 +50,7 @@ export default function MathTTS() {
   const [selectedVoice, setSelectedVoice] = useState<string>("")
   const [showOnlyEnglishVoices, setShowOnlyEnglishVoices] = useState<boolean>(true)
   const [showCheatSheet, setShowCheatSheet] = useState<boolean>(false)
+  const [ignoreMarkdown, setIgnoreMarkdown] = useState<boolean>(false)
 
   // Settings state
   const [latexMappings, setLatexMappings] = useState<Record<string, string>>(() => {
@@ -132,6 +133,7 @@ export default function MathTTS() {
       localStorage.setItem('mathTTS_minWordPause', String(minWordPause))
       localStorage.setItem('mathTTS_baseWordPause', String(baseWordPause))
       localStorage.setItem('mathTTS_maxWordPause', String(maxWordPause))
+      localStorage.setItem('mathTTS_ignoreMarkdown', String(ignoreMarkdown))
       
       // Also save selected voice if available
       if (selectedVoice) {
@@ -158,7 +160,8 @@ export default function MathTTS() {
     maxWordPause,
     selectedVoice,
     rate,
-    showOnlyEnglishVoices
+    showOnlyEnglishVoices,
+    ignoreMarkdown
   ])
 
   // Load available voices with English prioritization
@@ -313,13 +316,53 @@ export default function MathTTS() {
       if (savedShowOnlyEnglishVoices !== null) {
         setShowOnlyEnglishVoices(savedShowOnlyEnglishVoices === 'false' ? false : true)
       }
+      
+      // Load ignore markdown setting
+      const savedIgnoreMarkdown = localStorage.getItem('mathTTS_ignoreMarkdown')
+      if (savedIgnoreMarkdown !== null) {
+        setIgnoreMarkdown(savedIgnoreMarkdown === 'true')
+      }
     }
   }, [])
+
+  // Function to strip markdown formatting
+  const stripMarkdown = (text: string): string => {
+    if (!ignoreMarkdown) return text;
+    
+    // Replace markdown headers (# Header)
+    let result = text.replace(/^(#{1,6})\s+(.+)$/gm, '$2');
+    
+    // Replace bold (**text** or __text__)
+    result = result.replace(/(\*\*|__)(.*?)\1/g, '$2');
+    
+    // Replace italic (*text* or _text_)
+    result = result.replace(/(\*|_)(.*?)\1/g, '$2');
+    
+    // Replace strikethrough (~~text~~)
+    result = result.replace(/~~(.*?)~~/g, '$1');
+    
+    // Replace inline code (`code`)
+    result = result.replace(/`([^`]+)`/g, '$1');
+    
+    // Replace links ([text](url))
+    result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+    
+    // Replace blockquotes (> text)
+    result = result.replace(/^>\s+(.+)$/gm, '$1');
+    
+    // Replace horizontal rules (---, ***, ___)
+    result = result.replace(/^([-*_]){3,}$/gm, '');
+    
+    return result;
+  };
 
   // Split text into sentences and parse LaTeX when input changes
   useEffect(() => {
     if (input) {
-      const parsedResult = parseLatex(input, latexMappings, {
+      // Process markdown if needed
+      const processedInput = stripMarkdown(input);
+      
+      const parsedResult = parseLatex(processedInput, latexMappings, {
         useSymbolPrefix,
         symbolPrefix,
         prefixCategories,
@@ -344,7 +387,7 @@ export default function MathTTS() {
       setSentences([])
       setWords([])
     }
-  }, [input, latexMappings, useSymbolPrefix, symbolPrefix, prefixCategories, groupSymbols])
+  }, [input, latexMappings, useSymbolPrefix, symbolPrefix, prefixCategories, groupSymbols, ignoreMarkdown])
 
 // This is the corrected speak function to fix the "Break, Time equals 500 ms" issue
 // Replace the current speak function in page.tsx with this version
@@ -714,6 +757,20 @@ const speak = (text: string, index: number) => {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Symbol Cheat Sheet</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant={ignoreMarkdown ? "default" : "outline"} 
+                    size="icon" 
+                    onClick={() => setIgnoreMarkdown(!ignoreMarkdown)}
+                  >
+                    <span className="font-mono text-xs">MD</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{ignoreMarkdown ? "Markdown formatting ignored" : "EXPERIMENTAL: Enable markdown ignore"}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <Sheet>
@@ -1217,7 +1274,8 @@ const speak = (text: string, index: number) => {
                                 baseWordPause,
                                 maxWordPause
                               },
-                              rate
+                              rate,
+                              ignoreMarkdown
                             }
 
                             // Convert to JSON string
@@ -1321,6 +1379,11 @@ const speak = (text: string, index: number) => {
                                   // Import rate if it exists
                                   if (config.rate !== undefined) {
                                     setRate(config.rate)
+                                  }
+                                  
+                                  // Import ignore markdown setting if it exists
+                                  if (config.ignoreMarkdown !== undefined) {
+                                    setIgnoreMarkdown(config.ignoreMarkdown)
                                   }
                                   
                                   alert("Settings imported successfully!")
