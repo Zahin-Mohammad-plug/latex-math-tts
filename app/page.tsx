@@ -1528,6 +1528,7 @@ const speak = (text: string, index: number) => {
             )}
           </div>
         </CardFooter>
+        
       </Card>
 
       {showCheatSheet && (
