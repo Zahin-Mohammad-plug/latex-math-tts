@@ -1528,7 +1528,7 @@ const speak = (text: string, index: number) => {
             )}
           </div>
         </CardFooter>
-        
+
       </Card>
 
       {showCheatSheet && (
@@ -1541,6 +1541,29 @@ const speak = (text: string, index: number) => {
       )}
 
       <VersionDisplay />
+      <footer className="mt-8 text-center text-sm text-muted-foreground">
+          <p>
+            Explore more of my tools:{" "}
+            <a
+              href="https://styledfontexporter.zahin.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-primary"
+            >
+              Styled Font Exporter
+            </a>{" "}
+            |{" "}
+            <a
+              href="https://zahin.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-primary"
+            >
+              My Portfolio
+            </a>
+          </p>
+        </footer>
+
     </div>
   )
 }
